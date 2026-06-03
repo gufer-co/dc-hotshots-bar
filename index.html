@@ -443,17 +443,19 @@ function checkLogin() {
 
 // ══════════════════════════════════════════
 let state = {
-  articles: [],    // { id, name, category, price, stock, lowStockThreshold }
-  members: [],     // { id, name } — permanent
-  guests: [],      // { id, name } — pro Abend
-  orders: [],      // { id, guestId, articleId, qty, ts, paid, payMode }
-  purchases: [],   // { id, articleId, qty, costPerUnit, ts }
+  articles:     [],  // { id, name, category, price, stock, lowStockThreshold }
+  members:      [],  // { id, name } — permanent
+  guests:       [],  // { id, name } — pro Abend
+  orders:       [],  // { id, guestId, articleId, qty, ts, paid, payMode }
+  purchases:    [],  // { id, articleId, qty, costPerUnit, ts }
+  einladungen:  [],  // { id, ts, amount } — eingeladene offene Beträge
 };
 
 function applyStateData(data) {
   if (data) state = { ...state, ...data };
-  if (!state.purchases) state.purchases = [];
-  if (!state.members) state.members = [];
+  if (!state.purchases)   state.purchases   = [];
+  if (!state.members)     state.members     = [];
+  if (!state.einladungen) state.einladungen = [];
   state.articles.forEach(a => {
     if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3;
   });
@@ -494,10 +496,11 @@ function loadState() {
     const data = snapshot.val();
     if (data) {
       remoteUpdate = true;
-      state.articles  = toArray(data.articles);
-      state.guests    = toArray(data.guests);
-      state.orders    = toArray(data.orders);
-      state.purchases = toArray(data.purchases);
+      state.articles     = toArray(data.articles);
+      state.guests       = toArray(data.guests);
+      state.orders       = toArray(data.orders);
+      state.purchases    = toArray(data.purchases);
+      state.einladungen  = toArray(data.einladungen);
       state.articles.forEach(a => { if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3; });
       // KEIN initDemo() hier — Firebase-Daten niemals mit Demo überschreiben
       localStorage.setItem('darts-bar-state', JSON.stringify(state));
@@ -524,10 +527,11 @@ function saveState() {
   if (!remoteUpdate) {
     // Hauptdaten ohne members
     db.ref('data').set({
-      articles:  state.articles,
-      guests:    state.guests,
-      orders:    state.orders,
-      purchases: state.purchases,
+      articles:     state.articles,
+      guests:       state.guests,
+      orders:       state.orders,
+      purchases:    state.purchases,
+      einladungen:  state.einladungen,
     }).catch(() => {});
   }
 }
@@ -1115,6 +1119,9 @@ function renderAbrechnung() {
         <span style="font-size:.85rem;color:var(--text2)">Gesamt offen</span>
         <span style="font-size:1.3rem;font-weight:800;color:var(--accent)">${fmt(totalOpen)}</span>
       </div>
+      <div style="margin-top:10px">
+        <button class="btn btn-secondary btn-sm" style="width:100%" onclick="einladenAuth(${totalOpen})">🎁 Als Einladung buchen &amp; löschen</button>
+      </div>
     </div>
     ` : ''}
     <div class="pill-tabs">
@@ -1153,6 +1160,32 @@ function clearPaid() {
   saveState(); render();
 }
 
+function einladenAuth(amount) {
+  openModal(`
+    <h3>🎁 Einladung buchen</h3>
+    <p style="color:var(--text2);font-size:.85rem">Offener Betrag <strong style="color:var(--accent)">${fmt(amount)}</strong> wird als Einladung im Bericht vermerkt und alle offenen Bestellungen gelöscht.</p>
+    <div class="form-row"><div class="field">
+      <label>Passwort</label>
+      <input id="m-pw" type="password" placeholder="••••" autofocus>
+    </div></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-primary" onclick="einladenBestaetigt(${amount})">Bestätigen</button>
+    </div>
+  `);
+}
+
+function einladenBestaetigt(amount) {
+  const pw = document.getElementById('m-pw').value;
+  if (pw !== '0719') { showToast('Falsches Passwort'); return; }
+  closeModal();
+  state.einladungen.push({ id: uid(), ts: Date.now(), amount });
+  state.orders = state.orders.filter(o => o.paid); // offene löschen
+  saveState();
+  showToast(`🎁 ${fmt(amount)} als Einladung gebucht`);
+  render();
+}
+
 // ══════════════════════════════════════════
 //  BERICHT
 // ══════════════════════════════════════════
@@ -1183,6 +1216,13 @@ function renderBericht() {
     totalVerkauf += a.price * o.qty;
   });
 
+  // Einladungen in selected month
+  const einladungsEntries = (state.einladungen || [])
+    .filter(e => monthKey(new Date(e.ts)) === berichtMonth)
+    .sort((a, b) => a.ts - b.ts);
+  let totalEinladung = 0;
+  einladungsEntries.forEach(e => { totalEinladung += e.amount; });
+
   // Einkäufe in selected month — individual entries
   const einkaufsEntries = state.purchases
     .filter(p => monthKey(new Date(p.ts)) === berichtMonth)
@@ -1190,7 +1230,7 @@ function renderBericht() {
   let totalEinkauf = 0;
   einkaufsEntries.forEach(p => { totalEinkauf += p.costPerUnit * p.qty; });
 
-  const profit = totalVerkauf - totalEinkauf;
+  const profit = totalVerkauf - totalEinkauf - totalEinladung;
 
   const verkaufRows = verkaufsOrders.slice().sort((a,b) => a.ts - b.ts).map(o => {
     const a = state.articles.find(x => x.id === o.articleId);
@@ -1249,6 +1289,11 @@ function renderBericht() {
         <div class="sc-label">Einkäufe</div>
         <div class="sc-val expense">${fmt(totalEinkauf)}</div>
       </div>
+      ${totalEinladung > 0 ? `
+      <div class="summary-chip">
+        <div class="sc-label">Einladungen</div>
+        <div class="sc-val expense">${fmt(totalEinladung)}</div>
+      </div>` : ''}
       <div class="summary-chip">
         <div class="sc-label">Gewinn</div>
         <div class="sc-val profit">${fmt(profit)}</div>
@@ -1278,6 +1323,27 @@ function renderBericht() {
         </div>
       ` : ''}
     </div>
+
+    ${einladungsEntries.length ? `
+    <div class="card">
+      <div class="report-section">
+        <h3>🎁 Einladungen</h3>
+        ${einladungsEntries.map(e => `
+          <div class="report-row">
+            <div style="flex:1">
+              <div class="rname">Einladung</div>
+              <div style="font-size:.68rem;color:var(--text2)">${fmtDate(e.ts)}</div>
+            </div>
+            <span class="ramount expense">${fmt(e.amount)}</span>
+          </div>
+        `).join('')}
+      </div>
+      <div style="display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border)">
+        <span style="font-weight:800;color:var(--accent)">${fmt(totalEinladung)}</span>
+      </div>
+    </div>
+    ` : ''}
+
     ` : ''}
   `;
 }
