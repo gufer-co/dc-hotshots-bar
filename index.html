@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Darts Vereinsbar</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1a1a2e;
+      --surface: #16213e;
+      --surface2: #0f3460;
+      --accent: #e94560;
+      --accent2: #f5a623;
+      --green: #2ecc71;
+      --blue: #74b9ff;
+      --text: #eaeaea;
+      --text2: #a0a8b8;
+      --border: #2a3a5c;
+      --radius: 12px;
+      --nav-h: 60px;
+    }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--surface);
+      padding: 12px 16px 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: .5px; }
+    header h1 span { color: var(--accent); }
+
+    #app {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      padding-bottom: calc(var(--nav-h) + 14px);
+    }
+
+    nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: var(--nav-h);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      z-index: 100;
+    }
+    nav button {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--text2);
+      font-size: .58rem;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      cursor: pointer;
+      padding: 0;
+    }
+    nav button .icon { font-size: 1.25rem; }
+    nav button.active { color: var(--accent); }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .card-header h2 { font-size: .92rem; font-weight: 700; }
+
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: .82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.96); opacity: .85; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: var(--surface2); color: var(--text); }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-blue { background: #1a6fa8; color: #fff; }
+    .btn-sm { padding: 5px 10px; font-size: .73rem; }
+    .btn-icon { background: none; border: none; font-size: 1rem; cursor: pointer; padding: 4px; line-height: 1; }
+
+    input, select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: .88rem;
+      width: 100%;
+    }
+    input:focus, select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    label { font-size: .78rem; color: var(--text2); display: block; margin-bottom: 4px; }
+    .form-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .form-row .field { flex: 1; }
+
+    .list-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .list-item:last-child { border-bottom: none; }
+    .list-item .name { flex: 1; font-weight: 600; font-size: .88rem; }
+    .list-item .sub { font-size: .72rem; color: var(--text2); }
+
+    .qty-badge {
+      background: var(--surface2);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: .78rem;
+      font-weight: 700;
+      min-width: 34px;
+      text-align: center;
+    }
+    .qty-badge.low { background: #7a1a1a; color: #ff6b6b; }
+
+    .guest-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 8px;
+    }
+    .guest-card {
+      background: var(--surface2);
+      border: 2px solid transparent;
+      border-radius: var(--radius);
+      padding: 10px 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .15s, transform .1s;
+    }
+    .guest-card:active { transform: scale(.96); }
+    .guest-card.selected { border-color: var(--accent); }
+    .guest-card .gname { font-size: .82rem; font-weight: 700; }
+    .guest-card .gtab { font-size: .72rem; color: var(--accent2); font-weight: 600; margin-top: 2px; }
+
+    .article-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+      gap: 7px;
+      margin-top: 8px;
+    }
+    .article-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 9px 5px;
+      text-align: center;
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+    }
+    .article-btn:active { transform: scale(.94); background: var(--surface); }
+    .article-btn.out { opacity: .35; pointer-events: none; }
+    .article-btn .aname { font-size: .75rem; font-weight: 700; line-height: 1.2; }
+    .article-btn .aprice { font-size: .72rem; color: var(--accent2); margin-top: 3px; }
+    .article-btn .astock { font-size: .62rem; color: var(--text2); }
+
+    .order-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .order-line:last-child { border-bottom: none; }
+    .order-line .oname { flex: 1; font-size: .83rem; }
+    .order-line .odate { font-size: .68rem; color: var(--text2); }
+    .qty-ctrl { display: flex; align-items: center; gap: 5px; }
+    .qty-ctrl button {
+      background: var(--surface2);
+      border: none;
+      border-radius: 6px;
+      color: var(--text);
+      width: 26px; height: 26px;
+      font-size: .95rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .qty-ctrl .qty-num { min-width: 18px; text-align: center; font-weight: 700; font-size: .88rem; }
+    .order-line .osum { color: var(--accent2); font-weight: 700; font-size: .83rem; min-width: 46px; text-align: right; }
+
+    .total-bar {
+      background: var(--surface2);
+      border-radius: var(--radius);
+      padding: 11px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+    .total-bar .label { font-size: .82rem; color: var(--text2); }
+    .total-bar .amount { font-size: 1.25rem; font-weight: 800; color: var(--accent2); }
+
+    .pill-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .pill {
+      background: var(--surface2);
+      border: none;
+      border-radius: 20px;
+      color: var(--text2);
+      font-size: .75rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      cursor: pointer;
+    }
+    .pill.active { background: var(--accent); color: #fff; }
+
+    .bill-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .bill-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .bill-header .bname { flex: 1; font-weight: 700; font-size: .88rem; }
+    .bill-header .btotal { color: var(--accent2); font-weight: 800; font-size: .88rem; }
+    .bill-header .chevron { font-size: .75rem; color: var(--text2); transition: transform .2s; }
+    .bill-header.open .chevron { transform: rotate(180deg); }
+    .bill-details { padding: 0 14px 12px; display: none; }
+    .bill-details.open { display: block; }
+    .bill-detail-line {
+      display: flex;
+      justify-content: space-between;
+      font-size: .78rem;
+      padding: 3px 0;
+      color: var(--text2);
+    }
+    .bill-detail-line .bdate { font-size: .68rem; color: var(--text2); margin-left: 6px; }
+    .bill-detail-line span:last-child { color: var(--text); font-weight: 600; }
+    .bill-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+    .empty { text-align: center; padding: 36px 20px; color: var(--text2); }
+    .empty .eicon { font-size: 2.2rem; margin-bottom: 10px; }
+
+    #toast {
+      position: fixed;
+      bottom: calc(var(--nav-h) + 12px);
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 8px 18px;
+      font-size: .8rem;
+      font-weight: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s, transform .25s;
+      z-index: 200;
+      white-space: nowrap;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      display: flex; align-items: flex-end; justify-content: center;
+      z-index: 300;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px 20px 0 0;
+      padding: 20px 16px 32px;
+      width: 100%;
+      max-width: 480px;
+      transform: translateY(40px);
+      transition: transform .2s;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal h3 { font-size: .98rem; margin-bottom: 14px; font-weight: 700; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+    .modal-actions .btn { flex: 1; padding: 11px; }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+
+    /* Bericht */
+    .month-select { margin-bottom: 14px; }
+    .report-section { margin-bottom: 16px; }
+    .report-section h3 { font-size: .85rem; font-weight: 700; color: var(--text2); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .6px; }
+    .report-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: .82rem;
+    }
+    .report-row:last-child { border-bottom: none; }
+    .report-row .rname { flex: 1; }
+    .report-row .rqty { color: var(--text2); font-size: .75rem; margin-right: 12px; }
+    .report-row .ramount { font-weight: 700; }
+    .report-row .ramount.income { color: var(--green); }
+    .report-row .ramount.expense { color: var(--accent); }
+    .summary-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .summary-chip {
+      flex: 1;
+      background: var(--surface2);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .summary-chip .sc-label { font-size: .68rem; color: var(--text2); font-weight: 600; text-transform: uppercase; }
+    .summary-chip .sc-val { font-size: 1.1rem; font-weight: 800; margin-top: 2px; }
+    .summary-chip .sc-val.income { color: var(--green); }
+    .summary-chip .sc-val.expense { color: var(--accent); }
+    .summary-chip .sc-val.profit { color: var(--accent2); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🎯 DC Hotshots <span>Vereinsbar</span></h1>
+</header>
+
+<main id="app"></main>
+
+<nav>
+  <button onclick="showPage('inventur')" id="nav-inventur">
+    <span class="icon">📦</span>Inventur
+  </button>
+  <button onclick="showPage('gaeste')" id="nav-gaeste">
+    <span class="icon">👥</span>Gäste
+  </button>
+  <button onclick="showPage('bestellung')" id="nav-bestellung">
+    <span class="icon">🛒</span>Bestell.
+  </button>
+  <button onclick="showPage('abrechnung')" id="nav-abrechnung">
+    <span class="icon">💶</span>Abrech.
+  </button>
+  <button onclick="showPage('bericht')" id="nav-bericht">
+    <span class="icon">📊</span>Bericht
+  </button>
+</nav>
+
+<div id="toast"></div>
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let state = {
+  articles: [],    // { id, name, category, price, stock, lowStockThreshold }
+  guests: [],      // { id, name }
+  orders: [],      // { id, guestId, articleId, qty, ts, paid, payMode }
+  purchases: [],   // { id, articleId, qty, costPerUnit, ts }
+};
+
+function loadState() {
+  const saved = localStorage.getItem('darts-bar-state');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      state = { ...state, ...parsed };
+      // migrations
+      if (!state.purchases) state.purchases = [];
+      state.articles.forEach(a => {
+        if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3;
+      });
+    } catch(e) {}
+  }
+  if (!state.articles.length) initDemo();
+}
+
+function saveState() {
+  localStorage.setItem('darts-bar-state', JSON.stringify(state));
+}
+
+function initDemo() {
+  state.articles = [
+    { id: uid(), name: 'Bier (0,5L)',    category: 'getraenk',    price: 2.50, stock: 24, lowStockThreshold: 6 },
+    { id: uid(), name: 'Cola (0,33L)',   category: 'getraenk',    price: 1.50, stock: 12, lowStockThreshold: 4 },
+    { id: uid(), name: 'Wasser (0,5L)', category: 'getraenk',    price: 1.00, stock: 18, lowStockThreshold: 4 },
+    { id: uid(), name: 'Radler',         category: 'getraenk',    price: 2.00, stock: 12, lowStockThreshold: 3 },
+    { id: uid(), name: 'Schnapserl',     category: 'getraenk',    price: 1.50, stock: 20, lowStockThreshold: 5 },
+    { id: uid(), name: 'Chips',          category: 'suessigkeit', price: 1.00, stock: 8,  lowStockThreshold: 2 },
+    { id: uid(), name: 'Schokoriegel',   category: 'suessigkeit', price: 0.80, stock: 10, lowStockThreshold: 2 },
+    { id: uid(), name: 'Gummibären',     category: 'suessigkeit', price: 0.80, stock: 6,  lowStockThreshold: 2 },
+  ];
+  saveState();
+}
+
+function uid() { return Math.random().toString(36).slice(2, 10); }
+
+// ══════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════
+let currentPage = 'inventur';
+let selectedGuestId = null;
+
+function showPage(page) {
+  currentPage = page;
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-' + page).classList.add('active');
+  render();
+}
+
+function render() {
+  const app = document.getElementById('app');
+  switch(currentPage) {
+    case 'inventur':   app.innerHTML = renderInventur(); break;
+    case 'gaeste':     app.innerHTML = renderGaeste(); break;
+    case 'bestellung': app.innerHTML = renderBestellung(); break;
+    case 'abrechnung': app.innerHTML = renderAbrechnung(); break;
+    case 'bericht':    app.innerHTML = renderBericht(); break;
+  }
+}
+
+// ══════════════════════════════════════════
+//  INVENTUR
+// ══════════════════════════════════════════
+function renderInventur() {
+  const getraenke = state.articles.filter(a => a.category === 'getraenk');
+  const suessigkeiten = state.articles.filter(a => a.category === 'suessigkeit');
+
+  const renderList = (items) => items.map(a => `
+    <div class="list-item">
+      <div style="flex:1">
+        <div class="name">${esc(a.name)}</div>
+        <div class="sub">${fmt(a.price)} / Stück · Warnung ab ${a.lowStockThreshold}x</div>
+      </div>
+      <span class="qty-badge ${a.stock <= a.lowStockThreshold ? 'low' : ''}">${a.stock}x</span>
+      <button class="btn-icon" onclick="refillArticle('${a.id}')" title="Auffüllen">➕</button>
+      <button class="btn btn-sm btn-secondary" onclick="editArticle('${a.id}')">✏️</button>
+    </div>
+  `).join('');
+
+  return `
+    <div class="card">
+      <div class="card-header">
+        <h2>🍺 Getränke</h2>
+        <button class="btn btn-sm btn-primary" onclick="addArticle('getraenk')">+ Neu</button>
+      </div>
+      ${getraenke.length ? renderList(getraenke) : '<div style="color:var(--text2);font-size:.8rem">Keine Artikel</div>'}
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <h2>🍬 Süßigkeiten</h2>
+        <button class="btn btn-sm btn-primary" onclick="addArticle('suessigkeit')">+ Neu</button>
+      </div>
+      ${suessigkeiten.length ? renderList(suessigkeiten) : '<div style="color:var(--text2);font-size:.8rem">Keine Artikel</div>'}
+    </div>
+  `;
+}
+
+function addArticle(category) {
+  openModal(`
+    <h3>Neuer Artikel</h3>
+    <div class="form-row"><div class="field">
+      <label>Name</label>
+      <input id="m-name" placeholder="z.B. Bier 0,5L" autofocus>
+    </div></div>
+    <div class="form-row">
+      <div class="field"><label>Preis (€)</label>
+        <input id="m-price" type="number" step="0.1" min="0" placeholder="0.00">
+      </div>
+      <div class="field"><label>Bestand</label>
+        <input id="m-stock" type="number" min="0" placeholder="0">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Warnschwelle (Stück)</label>
+        <input id="m-threshold" type="number" min="0" value="3">
+      </div>
+      <div class="field"><label>Kategorie</label>
+        <select id="m-cat">
+          <option value="getraenk" ${category==='getraenk'?'selected':''}>🍺 Getränk</option>
+          <option value="suessigkeit" ${category==='suessigkeit'?'selected':''}>🍬 Süßigkeit</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveArticle()">Speichern</button>
+    </div>
+  `);
+}
+
+function editArticle(id) {
+  const a = state.articles.find(x => x.id === id);
+  if (!a) return;
+  openModal(`
+    <h3>Artikel bearbeiten</h3>
+    <input type="hidden" id="m-edit-id" value="${a.id}">
+    <div class="form-row"><div class="field">
+      <label>Name</label>
+      <input id="m-name" value="${esc(a.name)}">
+    </div></div>
+    <div class="form-row">
+      <div class="field"><label>Preis (€)</label>
+        <input id="m-price" type="number" step="0.1" min="0" value="${a.price}">
+      </div>
+      <div class="field"><label>Bestand</label>
+        <input id="m-stock" type="number" min="0" value="${a.stock}">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Warnschwelle (Stück)</label>
+        <input id="m-threshold" type="number" min="0" value="${a.lowStockThreshold}">
+      </div>
+      <div class="field"><label>Kategorie</label>
+        <select id="m-cat">
+          <option value="getraenk" ${a.category==='getraenk'?'selected':''}>🍺 Getränk</option>
+          <option value="suessigkeit" ${a.category==='suessigkeit'?'selected':''}>🍬 Süßigkeit</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="deleteArticle('${a.id}')">🗑️ Löschen</button>
+      <button class="btn btn-primary" onclick="saveArticle()">Speichern</button>
+    </div>
+  `);
+}
+
+function saveArticle() {
+  const name = document.getElementById('m-name').value.trim();
+  const price = parseFloat(document.getElementById('m-price').value) || 0;
+  const stock = parseInt(document.getElementById('m-stock').value) || 0;
+  const threshold = parseInt(document.getElementById('m-threshold').value) || 0;
+  const category = document.getElementById('m-cat').value;
+  const editId = document.getElementById('m-edit-id')?.value;
+  if (!name) { showToast('Bitte Namen eingeben'); return; }
+  if (editId) {
+    const a = state.articles.find(x => x.id === editId);
+    if (a) { a.name = name; a.price = price; a.stock = stock; a.category = category; a.lowStockThreshold = threshold; }
+  } else {
+    state.articles.push({ id: uid(), name, category, price, stock, lowStockThreshold: threshold });
+  }
+  saveState(); closeModal(); render();
+}
+
+function deleteArticle(id) {
+  if (!confirm('Artikel wirklich löschen?')) return;
+  state.articles = state.articles.filter(a => a.id !== id);
+  saveState(); closeModal(); render();
+}
+
+function refillArticle(id) {
+  const a = state.articles.find(x => x.id === id);
+  if (!a) return;
+  openModal(`
+    <h3>➕ Bestand auffüllen</h3>
+    <div style="color:var(--text2);font-size:.8rem;margin-bottom:12px">${esc(a.name)} — aktuell ${a.stock}x</div>
+    <div class="form-row">
+      <div class="field"><label>Menge hinzufügen</label>
+        <input id="m-refill-qty" type="number" min="1" value="1" autofocus>
+      </div>
+      <div class="field"><label>Einkaufspreis / Stück (€)</label>
+        <input id="m-refill-cost" type="number" step="0.01" min="0" placeholder="0.00">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-green" onclick="saveRefill('${a.id}')">Auffüllen & buchen</button>
+    </div>
+  `);
+}
+
+function saveRefill(articleId) {
+  const qty = parseInt(document.getElementById('m-refill-qty').value) || 0;
+  const cost = parseFloat(document.getElementById('m-refill-cost').value) || 0;
+  if (qty <= 0) { showToast('Menge muss > 0 sein'); return; }
+  const a = state.articles.find(x => x.id === articleId);
+  if (!a) return;
+  a.stock += qty;
+  state.purchases.push({ id: uid(), articleId, qty, costPerUnit: cost, ts: Date.now() });
+  saveState(); closeModal();
+  showToast(`✅ +${qty}x ${a.name} eingebucht`);
+  render();
+}
+
+// ══════════════════════════════════════════
+//  GÄSTE
+// ══════════════════════════════════════════
+function renderGaeste() {
+  const cards = state.guests.map(g => {
+    const tab = guestTotal(g.id, false);
+    return `
+      <div class="guest-card ${selectedGuestId === g.id ? 'selected' : ''}" onclick="selectGuest('${g.id}')">
+        <div class="gname">${esc(g.name)}</div>
+        ${tab > 0 ? `<div class="gtab">${fmt(tab)} offen</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="card">
+      <div class="card-header">
+        <h2>Gäste heute</h2>
+        <button class="btn btn-sm btn-primary" onclick="addGuest()">+ Gast</button>
+      </div>
+      ${state.guests.length
+        ? `<div class="guest-grid">${cards}</div>`
+        : '<div class="empty"><div class="eicon">👋</div><div>Noch keine Gäste hinzugefügt</div></div>'}
+    </div>
+    ${selectedGuestId ? renderGuestDetail() : ''}
+  `;
+}
+
+function renderGuestDetail() {
+  const g = state.guests.find(x => x.id === selectedGuestId);
+  if (!g) return '';
+  const orders = state.orders.filter(o => o.guestId === g.id && !o.paid);
+  const total = orders.reduce((s, o) => {
+    const a = state.articles.find(x => x.id === o.articleId);
+    return s + (a ? a.price * o.qty : 0);
+  }, 0);
+
+  const lines = orders.map(o => {
+    const a = state.articles.find(x => x.id === o.articleId);
+    if (!a) return '';
+    return `
+      <div class="order-line">
+        <div style="flex:1">
+          <div class="oname">${esc(a.name)}</div>
+          <div class="odate">${fmtDate(o.ts)}</div>
+        </div>
+        <span style="color:var(--text2);font-size:.78rem">${o.qty}×</span>
+        <span class="osum">${fmt(a.price * o.qty)}</span>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="card">
+      <div class="card-header">
+        <h2>${esc(g.name)}</h2>
+        <button class="btn-icon" onclick="removeGuest('${g.id}')" title="Gast entfernen">❌</button>
+      </div>
+      ${orders.length ? lines : '<div style="color:var(--text2);font-size:.8rem">Kein offener Konsum</div>'}
+      ${total > 0 ? `
+        <hr class="divider">
+        <div class="total-bar">
+          <span class="label">Offener Tab</span>
+          <span class="amount">${fmt(total)}</span>
+        </div>
+        <div style="margin-top:10px">
+          <button class="btn btn-green" style="width:100%" onclick="payGuest('${g.id}','cash')">💵 Bar bezahlen</button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function addGuest() {
+  openModal(`
+    <h3>Neuen Gast hinzufügen</h3>
+    <div class="form-row"><div class="field">
+      <label>Name</label>
+      <input id="m-gname" placeholder="Name des Gastes" autofocus>
+    </div></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveGuest()">Hinzufügen</button>
+    </div>
+  `);
+}
+
+function saveGuest() {
+  const name = document.getElementById('m-gname').value.trim();
+  if (!name) { showToast('Bitte Namen eingeben'); return; }
+  state.guests.push({ id: uid(), name });
+  saveState(); closeModal(); render();
+}
+
+function selectGuest(id) {
+  selectedGuestId = selectedGuestId === id ? null : id;
+  render();
+}
+
+function removeGuest(id) {
+  if (!confirm('Gast und alle offenen Bestellungen entfernen?')) return;
+  state.guests = state.guests.filter(g => g.id !== id);
+  state.orders = state.orders.filter(o => o.guestId !== id);
+  selectedGuestId = null;
+  saveState(); render();
+}
+
+function payGuest(guestId, mode) {
+  state.orders.forEach(o => {
+    if (o.guestId === guestId && !o.paid) { o.paid = true; o.payMode = mode; }
+  });
+  saveState();
+  showToast('Bezahlt! 🎉');
+  render();
+}
+
+// ══════════════════════════════════════════
+//  BESTELLUNG
+// ══════════════════════════════════════════
+let orderGuestId = null;
+let orderMode = 'tab';
+let orderCart = {};
+
+function renderBestellung() {
+  const guestOptions = state.guests.map(g =>
+    `<option value="${g.id}" ${orderGuestId === g.id ? 'selected' : ''}>${esc(g.name)}</option>`
+  ).join('');
+
+  const getraenke = state.articles.filter(a => a.category === 'getraenk');
+  const suessigkeiten = state.articles.filter(a => a.category === 'suessigkeit');
+
+  const renderArtBtns = (items) => items.map(a => `
+    <div class="article-btn ${a.stock <= 0 ? 'out' : ''}" onclick="addToCart('${a.id}')">
+      <div class="aname">${esc(a.name)}</div>
+      <div class="aprice">${fmt(a.price)}</div>
+      <div class="astock">${a.stock > 0 ? a.stock + ' verf.' : 'Vergriffen'}</div>
+    </div>
+  `).join('');
+
+  const cartEntries = Object.entries(orderCart).filter(([,q]) => q > 0);
+  const cartTotal = cartEntries.reduce((s, [id, q]) => {
+    const a = state.articles.find(x => x.id === id);
+    return s + (a ? a.price * q : 0);
+  }, 0);
+
+  const cartLines = cartEntries.map(([id, q]) => {
+    const a = state.articles.find(x => x.id === id);
+    if (!a) return '';
+    return `
+      <div class="order-line">
+        <span class="oname">${esc(a.name)}</span>
+        <div class="qty-ctrl">
+          <button onclick="changeCart('${id}',-1)">−</button>
+          <span class="qty-num">${q}</span>
+          <button onclick="changeCart('${id}',1)">+</button>
+        </div>
+        <span class="osum">${fmt(a.price * q)}</span>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="card">
+      <div class="card-header"><h2>Für wen?</h2></div>
+      ${state.guests.length
+        ? `<select onchange="setOrderGuest(this.value)">
+            <option value="">— Gast wählen —</option>
+            ${guestOptions}
+           </select>`
+        : `<div style="color:var(--text2);font-size:.8rem">Zuerst Gäste anlegen 👥</div>`}
+      ${orderGuestId ? `
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="pill ${orderMode==='tab'?'active':''}" onclick="setOrderMode('tab')">📋 Tab</button>
+          <button class="pill ${orderMode==='sofort'?'active':''}" onclick="setOrderMode('sofort')">💵 Sofort</button>
+        </div>
+      ` : ''}
+    </div>
+    ${orderGuestId ? `
+    <div class="card">
+      <h2 style="margin-bottom:8px">🍺 Getränke</h2>
+      <div class="article-grid">${renderArtBtns(getraenke)}</div>
+    </div>
+    <div class="card">
+      <h2 style="margin-bottom:8px">🍬 Süßigkeiten</h2>
+      <div class="article-grid">${renderArtBtns(suessigkeiten)}</div>
+    </div>
+    ${cartEntries.length ? `
+    <div class="card">
+      <div class="card-header"><h2>Warenkorb</h2>
+        <button class="btn btn-sm btn-secondary" onclick="clearCart()">Leeren</button>
+      </div>
+      ${cartLines}
+      <div class="total-bar">
+        <span class="label">Gesamt</span>
+        <span class="amount">${fmt(cartTotal)}</span>
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-top:10px;padding:12px" onclick="submitOrder()">
+        ${orderMode === 'sofort' ? '💵 Jetzt buchen & bezahlen' : '📋 Auf Tab buchen'}
+      </button>
+    </div>
+    ` : ''}
+    ` : ''}
+  `;
+}
+
+function setOrderGuest(id) { orderGuestId = id || null; orderCart = {}; render(); }
+function setOrderMode(mode) { orderMode = mode; render(); }
+
+function addToCart(articleId) {
+  if (!orderGuestId) { showToast('Bitte zuerst Gast wählen'); return; }
+  orderCart[articleId] = (orderCart[articleId] || 0) + 1;
+  render();
+}
+
+function changeCart(articleId, delta) {
+  orderCart[articleId] = Math.max(0, (orderCart[articleId] || 0) + delta);
+  if (orderCart[articleId] === 0) delete orderCart[articleId];
+  render();
+}
+
+function clearCart() { orderCart = {}; render(); }
+
+function submitOrder() {
+  const entries = Object.entries(orderCart).filter(([,q]) => q > 0);
+  if (!entries.length) return;
+  for (const [id, q] of entries) {
+    const a = state.articles.find(x => x.id === id);
+    if (a && a.stock < q) { showToast(`Zu wenig Bestand: ${a.name}`); return; }
+  }
+  const paid = orderMode === 'sofort';
+  for (const [articleId, qty] of entries) {
+    const a = state.articles.find(x => x.id === articleId);
+    if (a) {
+      a.stock -= qty;
+      state.orders.push({ id: uid(), guestId: orderGuestId, articleId, qty, ts: Date.now(), paid, payMode: paid ? 'cash' : null });
+    }
+  }
+  orderCart = {};
+  saveState();
+  showToast(paid ? '💵 Bezahlt & gebucht!' : '📋 Auf Tab gebucht!');
+  render();
+}
+
+// ══════════════════════════════════════════
+//  ABRECHNUNG
+// ══════════════════════════════════════════
+let billFilter = 'offen';
+
+function renderAbrechnung() {
+  const guests = state.guests.filter(g => filteredOrders(g.id).length > 0);
+
+  const totalOpen = state.orders
+    .filter(o => !o.paid)
+    .reduce((s, o) => {
+      const a = state.articles.find(x => x.id === o.articleId);
+      return s + (a ? a.price * o.qty : 0);
+    }, 0);
+
+  const cards = guests.map(g => {
+    const orders = filteredOrders(g.id);
+    const total = orders.reduce((s, o) => {
+      const a = state.articles.find(x => x.id === o.articleId);
+      return s + (a ? a.price * o.qty : 0);
+    }, 0);
+    const isOpen = orders.some(o => !o.paid);
+
+    // Group by article for summary, but keep individual lines with dates
+    const lines = orders.map(o => {
+      const a = state.articles.find(x => x.id === o.articleId);
+      if (!a) return '';
+      return `
+        <div class="bill-detail-line">
+          <span>${esc(a.name)} × ${o.qty}<span class="bdate">${fmtDate(o.ts)}</span></span>
+          <span>${fmt(a.price * o.qty)}</span>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="bill-card">
+        <div class="bill-header" onclick="toggleBill(this)">
+          <span class="bname">${esc(g.name)}</span>
+          <span class="btotal">${fmt(total)}</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="bill-details">
+          ${lines}
+          ${isOpen ? `
+            <div class="bill-actions">
+              <button class="btn btn-green btn-sm" style="width:100%" onclick="payGuest('${g.id}','cash');render()">💵 Bar bezahlen</button>
+            </div>
+          ` : `<div style="color:var(--green);font-size:.78rem;margin-top:8px">✅ Bezahlt</div>`}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    ${totalOpen > 0 ? `
+    <div class="card" style="border-color:var(--accent)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.85rem;color:var(--text2)">Gesamt offen</span>
+        <span style="font-size:1.3rem;font-weight:800;color:var(--accent)">${fmt(totalOpen)}</span>
+      </div>
+    </div>
+    ` : ''}
+    <div class="pill-tabs">
+      <button class="pill ${billFilter==='offen'?'active':''}" onclick="setBillFilter('offen')">Offen</button>
+      <button class="pill ${billFilter==='bezahlt'?'active':''}" onclick="setBillFilter('bezahlt')">Bezahlt</button>
+      <button class="pill ${billFilter==='alle'?'active':''}" onclick="setBillFilter('alle')">Alle</button>
+    </div>
+    ${guests.length ? cards : '<div class="empty"><div class="eicon">🎉</div><div>Nichts zu sehen hier</div></div>'}
+    ${state.orders.some(o => o.paid) ? `
+      <div style="text-align:center;margin-top:14px">
+        <button class="btn btn-secondary btn-sm" onclick="clearPaid()">🗑️ Bezahlte Buchungen löschen</button>
+      </div>
+    ` : ''}
+  `;
+}
+
+function filteredOrders(guestId) {
+  return state.orders.filter(o => {
+    if (o.guestId !== guestId) return false;
+    if (billFilter === 'offen') return !o.paid;
+    if (billFilter === 'bezahlt') return o.paid;
+    return true;
+  });
+}
+
+function setBillFilter(f) { billFilter = f; render(); }
+
+function toggleBill(header) {
+  header.classList.toggle('open');
+  header.nextElementSibling.classList.toggle('open');
+}
+
+function clearPaid() {
+  if (!confirm('Alle bezahlten Buchungen löschen?')) return;
+  state.orders = state.orders.filter(o => !o.paid);
+  saveState(); render();
+}
+
+// ══════════════════════════════════════════
+//  BERICHT
+// ══════════════════════════════════════════
+let berichtMonth = monthKey(new Date());
+
+function renderBericht() {
+  // Collect all months from orders and purchases
+  const months = new Set();
+  state.orders.forEach(o => months.add(monthKey(new Date(o.ts))));
+  state.purchases.forEach(p => months.add(monthKey(new Date(p.ts))));
+  const sortedMonths = [...months].sort().reverse();
+  if (!months.has(berichtMonth) && sortedMonths.length > 0) berichtMonth = sortedMonths[0];
+
+  const monthOptions = sortedMonths.map(m =>
+    `<option value="${m}" ${m === berichtMonth ? 'selected' : ''}>${fmtMonth(m)}</option>`
+  ).join('');
+
+  // Verkäufe (paid orders in selected month)
+  const verkaufsOrders = state.orders.filter(o => o.paid && monthKey(new Date(o.ts)) === berichtMonth);
+  const verkaufMap = {};
+  let totalVerkauf = 0;
+  verkaufsOrders.forEach(o => {
+    const a = state.articles.find(x => x.id === o.articleId);
+    if (!a) return;
+    if (!verkaufMap[o.articleId]) verkaufMap[o.articleId] = { name: a.name, qty: 0, total: 0 };
+    verkaufMap[o.articleId].qty += o.qty;
+    verkaufMap[o.articleId].total += a.price * o.qty;
+    totalVerkauf += a.price * o.qty;
+  });
+
+  // Einkäufe in selected month
+  const einkaufsEntries = state.purchases.filter(p => monthKey(new Date(p.ts)) === berichtMonth);
+  const einkaufMap = {};
+  let totalEinkauf = 0;
+  einkaufsEntries.forEach(p => {
+    const a = state.articles.find(x => x.id === p.articleId);
+    const name = a ? a.name : 'Unbekannt';
+    if (!einkaufMap[p.articleId]) einkaufMap[p.articleId] = { name, qty: 0, total: 0 };
+    einkaufMap[p.articleId].qty += p.qty;
+    einkaufMap[p.articleId].total += p.costPerUnit * p.qty;
+    totalEinkauf += p.costPerUnit * p.qty;
+  });
+
+  const profit = totalVerkauf - totalEinkauf;
+
+  const verkaufRows = Object.values(verkaufMap).sort((a,b) => b.total - a.total).map(x => `
+    <div class="report-row">
+      <span class="rname">${esc(x.name)}</span>
+      <span class="rqty">${x.qty}×</span>
+      <span class="ramount income">${fmt(x.total)}</span>
+    </div>
+  `).join('');
+
+  const einkaufRows = Object.values(einkaufMap).sort((a,b) => b.total - a.total).map(x => `
+    <div class="report-row">
+      <span class="rname">${esc(x.name)}</span>
+      <span class="rqty">${x.qty}×</span>
+      <span class="ramount expense">${x.total > 0 ? fmt(x.total) : '—'}</span>
+    </div>
+  `).join('');
+
+  return `
+    <div class="card month-select">
+      <div class="card-header" style="margin-bottom:0">
+        <h2>📊 Monatsbericht</h2>
+      </div>
+      ${sortedMonths.length ? `
+        <select onchange="setBerichtMonth(this.value)" style="margin-top:10px">
+          ${monthOptions}
+        </select>
+      ` : '<div style="color:var(--text2);font-size:.8rem;margin-top:8px">Noch keine Daten vorhanden</div>'}
+    </div>
+
+    ${sortedMonths.length ? `
+    <div class="summary-bar">
+      <div class="summary-chip">
+        <div class="sc-label">Verkäufe</div>
+        <div class="sc-val income">${fmt(totalVerkauf)}</div>
+      </div>
+      <div class="summary-chip">
+        <div class="sc-label">Einkäufe</div>
+        <div class="sc-val expense">${fmt(totalEinkauf)}</div>
+      </div>
+      <div class="summary-chip">
+        <div class="sc-label">Gewinn</div>
+        <div class="sc-val profit">${fmt(profit)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="report-section">
+        <h3>💰 Verkäufe</h3>
+        ${verkaufRows || '<div style="color:var(--text2);font-size:.8rem">Keine bezahlten Bestellungen</div>'}
+      </div>
+      ${Object.keys(verkaufMap).length ? `
+        <div style="display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border)">
+          <span style="font-weight:800;color:var(--green)">${fmt(totalVerkauf)}</span>
+        </div>
+      ` : ''}
+    </div>
+
+    <div class="card">
+      <div class="report-section">
+        <h3>🛒 Einkäufe</h3>
+        ${einkaufRows || '<div style="color:var(--text2);font-size:.8rem">Keine Einkäufe gebucht</div>'}
+      </div>
+      ${Object.keys(einkaufMap).length ? `
+        <div style="display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border)">
+          <span style="font-weight:800;color:var(--accent)">${fmt(totalEinkauf)}</span>
+        </div>
+      ` : ''}
+    </div>
+    ` : ''}
+  `;
+}
+
+function setBerichtMonth(m) { berichtMonth = m; render(); }
+
+function monthKey(date) {
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
+}
+
+function fmtMonth(key) {
+  const [y, m] = key.split('-');
+  const names = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  return names[parseInt(m) - 1] + ' ' + y;
+}
+
+// ══════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════
+function guestTotal(guestId, includePaid = false) {
+  return state.orders
+    .filter(o => o.guestId === guestId && (includePaid || !o.paid))
+    .reduce((s, o) => {
+      const a = state.articles.find(x => x.id === o.articleId);
+      return s + (a ? a.price * o.qty : 0);
+    }, 0);
+}
+
+function fmt(n) {
+  return '€ ' + n.toFixed(2).replace('.', ',');
+}
+
+function fmtDate(ts) {
+  const d = new Date(ts);
+  const day = String(d.getDate()).padStart(2,'0');
+  const mon = String(d.getMonth()+1).padStart(2,'0');
+  const h = String(d.getHours()).padStart(2,'0');
+  const min = String(d.getMinutes()).padStart(2,'0');
+  return `${day}.${mon}. ${h}:${min}`;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, duration = 2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function openModal(html) {
+  document.getElementById('modal-content').innerHTML = html;
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => {
+    const inp = document.querySelector('#modal-content input');
+    if (inp) inp.focus();
+  }, 100);
+}
+
+window.closeModal = (e) => {
+  if (!e || e.target === document.getElementById('modal-overlay')) {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+};
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+loadState();
+showPage('inventur');
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
