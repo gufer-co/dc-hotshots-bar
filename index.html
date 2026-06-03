@@ -359,6 +359,22 @@
 </head>
 <body>
 
+<!-- Login screen -->
+<div id="login-screen" style="
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:999;padding:32px;
+">
+  <div style="font-size:2.5rem;margin-bottom:12px">🎯</div>
+  <div style="font-size:1.2rem;font-weight:800;margin-bottom:4px">DC Hotshots</div>
+  <div style="font-size:.85rem;color:var(--text2);margin-bottom:32px">Vereinsbar</div>
+  <input id="login-pw" type="password" placeholder="Passwort" autofocus
+    style="max-width:240px;text-align:center;font-size:1.1rem;letter-spacing:.2em;margin-bottom:14px"
+    onkeydown="if(event.key==='Enter') checkLogin()">
+  <button class="btn btn-primary" style="width:240px;padding:12px;font-size:.95rem" onclick="checkLogin()">Einloggen</button>
+  <div id="login-err" style="color:var(--accent);font-size:.8rem;margin-top:10px;min-height:1.2em"></div>
+</div>
+
 <header>
   <h1>🎯 DC Hotshots <span>Vereinsbar</span></h1>
 </header>
@@ -391,6 +407,21 @@
 <script>
 // ══════════════════════════════════════════
 //  STATE
+// ══════════════════════════════════════════
+//  LOGIN
+// ══════════════════════════════════════════
+function checkLogin() {
+  const pw = document.getElementById('login-pw').value;
+  if (pw === '1957') {
+    sessionStorage.setItem('darts-auth', '1');
+    document.getElementById('login-screen').style.display = 'none';
+  } else {
+    document.getElementById('login-err').textContent = 'Falsches Passwort';
+    document.getElementById('login-pw').value = '';
+    document.getElementById('login-pw').focus();
+  }
+}
+
 // ══════════════════════════════════════════
 let state = {
   articles: [],    // { id, name, category, price, stock, lowStockThreshold }
@@ -1399,6 +1430,13 @@ window.closeModal = (e) => {
 // ══════════════════════════════════════════
 loadState();
 showPage('inventur');
+
+// Zeige Login wenn noch nicht authentifiziert
+if (sessionStorage.getItem('darts-auth') !== '1') {
+  document.getElementById('login-screen').style.display = 'flex';
+} else {
+  document.getElementById('login-screen').style.display = 'none';
+}
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
