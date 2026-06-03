@@ -464,26 +464,32 @@ function applyStateData(data) {
 function toArray(val) {
   if (!val) return [];
   if (Array.isArray(val)) return val;
-  return Object.values(val); // Firebase gibt Objekte statt Arrays zurück
+  return Object.values(val);
 }
 
 function loadState() {
-  // localStorage sofort laden damit App nicht leer startet
+  // Members NUR aus localStorage — nie aus Firebase (damit sie nie verschwinden)
+  const savedMembers = localStorage.getItem('darts-members');
+  if (savedMembers) {
+    try { state.members = JSON.parse(savedMembers); } catch(e) {}
+  }
+  if (!state.members.length) initMembers();
+
+  // Restliche Daten aus localStorage laden
   const saved = localStorage.getItem('darts-bar-state');
-  try { applyStateData(saved ? JSON.parse(saved) : null); } catch(e) { applyStateData(null); }
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      state.articles  = parsed.articles  || [];
+      state.guests    = parsed.guests    || [];
+      state.orders    = parsed.orders    || [];
+      state.purchases = parsed.purchases || [];
+    } catch(e) {}
+  }
+  state.articles.forEach(a => { if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3; });
+  if (!state.articles.length) initDemo();
 
-  // Members separat in Firebase speichern damit sie nie überschrieben werden
-  const membersRef = db.ref('members');
-  membersRef.on('value', snapshot => {
-    const data = toArray(snapshot.val());
-    if (data.length > 0) {
-      state.members = data;
-      localStorage.setItem('darts-bar-state', JSON.stringify(state));
-      render();
-    }
-  });
-
-  // Hauptdaten-Listener (ohne members)
+  // Firebase Listener: nur Artikel/Gäste/Bestellungen/Einkäufe — KEINE Members
   db.ref('data').on('value', snapshot => {
     const data = snapshot.val();
     if (data) {
@@ -492,9 +498,7 @@ function loadState() {
       state.guests    = toArray(data.guests);
       state.orders    = toArray(data.orders);
       state.purchases = toArray(data.purchases);
-      state.articles.forEach(a => {
-        if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3;
-      });
+      state.articles.forEach(a => { if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3; });
       if (!state.articles.length) initDemo();
       localStorage.setItem('darts-bar-state', JSON.stringify(state));
       render();
