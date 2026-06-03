@@ -6,8 +6,10 @@
   <meta name="theme-color" content="#1a1a2e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Darts Vereinsbar</title>
+  <title>DC Hotshots Vereinsbar</title>
   <link rel="manifest" href="manifest.json">
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -409,6 +411,22 @@
 // ══════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════
+//  FIREBASE
+// ══════════════════════════════════════════
+firebase.initializeApp({
+  apiKey: "AIzaSyAqnfBs-ShWpKk6vmWc9t9eQRV1-RruSeg",
+  authDomain: "dc-hotshots-bar.firebaseapp.com",
+  databaseURL: "https://dc-hotshots-bar-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "dc-hotshots-bar",
+  storageBucket: "dc-hotshots-bar.firebasestorage.app",
+  messagingSenderId: "533694552241",
+  appId: "1:533694552241:web:901786f2cf26cdf28eea90"
+});
+const db = firebase.database();
+const dbRef = db.ref('state');
+let remoteUpdate = false; // verhindert Endlosschleife
+
+// ══════════════════════════════════════════
 //  LOGIN
 // ══════════════════════════════════════════
 function checkLogin() {
@@ -432,21 +450,35 @@ let state = {
   purchases: [],   // { id, articleId, qty, costPerUnit, ts }
 };
 
-function loadState() {
-  const saved = localStorage.getItem('darts-bar-state');
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved);
-      state = { ...state, ...parsed };
-      if (!state.purchases) state.purchases = [];
-      if (!state.members) state.members = [];
-      state.articles.forEach(a => {
-        if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3;
-      });
-    } catch(e) {}
-  }
+function applyStateData(data) {
+  if (data) state = { ...state, ...data };
+  if (!state.purchases) state.purchases = [];
+  if (!state.members) state.members = [];
+  state.articles.forEach(a => {
+    if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3;
+  });
   if (!state.articles.length) initDemo();
   if (!state.members.length) initMembers();
+}
+
+function loadState() {
+  // localStorage sofort laden damit App nicht leer startet
+  const saved = localStorage.getItem('darts-bar-state');
+  try { applyStateData(saved ? JSON.parse(saved) : null); } catch(e) { applyStateData(null); }
+
+  // Firebase Echtzeit-Listener
+  dbRef.on('value', snapshot => {
+    const data = snapshot.val();
+    if (data) {
+      remoteUpdate = true;
+      state = { ...state, ...data };
+      if (!state.purchases) state.purchases = [];
+      if (!state.members) state.members = [];
+      localStorage.setItem('darts-bar-state', JSON.stringify(state));
+      render();
+      remoteUpdate = false;
+    }
+  });
 }
 
 function initMembers() {
@@ -458,6 +490,7 @@ function initMembers() {
 
 function saveState() {
   localStorage.setItem('darts-bar-state', JSON.stringify(state));
+  if (!remoteUpdate) dbRef.set(state).catch(() => {});
 }
 
 function initDemo() {
