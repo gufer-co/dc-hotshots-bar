@@ -1,4 +1,4 @@
-const CACHE = 'darts-bar-v3';
+const CACHE = 'darts-bar-v4';
 const ASSETS = ['/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {

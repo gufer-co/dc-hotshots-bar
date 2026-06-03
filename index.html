@@ -1439,7 +1439,19 @@ if (sessionStorage.getItem('darts-auth') !== '1') {
 }
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    // Sofort nach Updates suchen
+    reg.update();
+    // Wenn neuer SW wartet: Seite neu laden sobald er aktiv wird
+    reg.addEventListener('updatefound', () => {
+      const newSW = reg.installing;
+      newSW.addEventListener('statechange', () => {
+        if (newSW.state === 'activated') location.reload();
+      });
+    });
+  }).catch(() => {});
+  // Reload wenn SW-Controller wechselt (anderer Tab hat Update ausgelöst)
+  navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
 }
 </script>
 </body>
