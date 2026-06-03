@@ -499,7 +499,7 @@ function loadState() {
       state.orders    = toArray(data.orders);
       state.purchases = toArray(data.purchases);
       state.articles.forEach(a => { if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3; });
-      if (!state.articles.length) initDemo();
+      // KEIN initDemo() hier — Firebase-Daten niemals mit Demo überschreiben
       localStorage.setItem('darts-bar-state', JSON.stringify(state));
       render();
       remoteUpdate = false;
@@ -515,9 +515,8 @@ function initMembers() {
 }
 
 function saveMembers() {
-  // Members separat speichern — werden nie durch Hauptdaten überschrieben
-  db.ref('members').set(state.members).catch(() => {});
-  localStorage.setItem('darts-bar-state', JSON.stringify(state));
+  // Members NUR in separatem localStorage — nie Firebase
+  localStorage.setItem('darts-members', JSON.stringify(state.members));
 }
 
 function saveState() {
