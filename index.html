@@ -461,27 +461,41 @@ function applyStateData(data) {
   if (!state.members.length) initMembers();
 }
 
+function toArray(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  return Object.values(val); // Firebase gibt Objekte statt Arrays zurück
+}
+
 function loadState() {
   // localStorage sofort laden damit App nicht leer startet
   const saved = localStorage.getItem('darts-bar-state');
   try { applyStateData(saved ? JSON.parse(saved) : null); } catch(e) { applyStateData(null); }
 
-  // Firebase Echtzeit-Listener
-  dbRef.on('value', snapshot => {
+  // Members separat in Firebase speichern damit sie nie überschrieben werden
+  const membersRef = db.ref('members');
+  membersRef.on('value', snapshot => {
+    const data = toArray(snapshot.val());
+    if (data.length > 0) {
+      state.members = data;
+      localStorage.setItem('darts-bar-state', JSON.stringify(state));
+      render();
+    }
+  });
+
+  // Hauptdaten-Listener (ohne members)
+  db.ref('data').on('value', snapshot => {
     const data = snapshot.val();
     if (data) {
       remoteUpdate = true;
-      state = { ...state, ...data };
-      // Firebase speichert Arrays als Objekte — zurück in Arrays umwandeln
-      ['articles','members','guests','orders','purchases'].forEach(key => {
-        if (state[key] && !Array.isArray(state[key])) {
-          state[key] = Object.values(state[key]);
-        }
-        if (!state[key]) state[key] = [];
-      });
+      state.articles  = toArray(data.articles);
+      state.guests    = toArray(data.guests);
+      state.orders    = toArray(data.orders);
+      state.purchases = toArray(data.purchases);
       state.articles.forEach(a => {
         if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3;
       });
+      if (!state.articles.length) initDemo();
       localStorage.setItem('darts-bar-state', JSON.stringify(state));
       render();
       remoteUpdate = false;
@@ -493,12 +507,26 @@ function initMembers() {
   ['Christian', 'Hans', 'Guido', 'Sabine', 'Ursi'].forEach(name => {
     state.members.push({ id: uid(), name });
   });
-  saveState();
+  saveMembers();
+}
+
+function saveMembers() {
+  // Members separat speichern — werden nie durch Hauptdaten überschrieben
+  db.ref('members').set(state.members).catch(() => {});
+  localStorage.setItem('darts-bar-state', JSON.stringify(state));
 }
 
 function saveState() {
   localStorage.setItem('darts-bar-state', JSON.stringify(state));
-  if (!remoteUpdate) dbRef.set(state).catch(() => {});
+  if (!remoteUpdate) {
+    // Hauptdaten ohne members
+    db.ref('data').set({
+      articles:  state.articles,
+      guests:    state.guests,
+      orders:    state.orders,
+      purchases: state.purchases,
+    }).catch(() => {});
+  }
 }
 
 function initDemo() {
@@ -837,14 +865,14 @@ function saveMember() {
   const name = document.getElementById('m-gname').value.trim();
   if (!name) { showToast('Bitte Namen eingeben'); return; }
   state.members.push({ id: uid(), name });
-  saveState(); closeModal(); render();
+  saveMembers(); closeModal(); render();
 }
 
 function removeMember(id) {
   if (!confirm('Mitglied wirklich entfernen? Alle Bestellungen bleiben erhalten.')) return;
   state.members = state.members.filter(m => m.id !== id);
   selectedGuestId = null;
-  saveState(); render();
+  saveMembers(); render();
 }
 
 function addGuest() {
