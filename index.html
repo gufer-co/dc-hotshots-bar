@@ -1088,13 +1088,24 @@ function renderBericht() {
 
   const profit = totalVerkauf - totalEinkauf;
 
-  const verkaufRows = Object.values(verkaufMap).sort((a,b) => b.total - a.total).map(x => `
-    <div class="report-row">
-      <span class="rname">${esc(x.name)}</span>
-      <span class="rqty">${x.qty}×</span>
-      <span class="ramount income">${fmt(x.total)}</span>
-    </div>
-  `).join('');
+  const verkaufRows = verkaufsOrders.slice().sort((a,b) => a.ts - b.ts).map(o => {
+    const a = state.articles.find(x => x.id === o.articleId);
+    const name = a ? a.name : 'Unbekannt';
+    const price = a ? a.price : 0;
+    const total = price * o.qty;
+    const person = findPerson(o.guestId);
+    const pname = person ? person.name : '?';
+    return `
+      <div class="report-row">
+        <div style="flex:1">
+          <div class="rname">${esc(name)}</div>
+          <div style="font-size:.68rem;color:var(--text2)">${fmtDate(o.ts)} · ${o.qty}× · ${esc(pname)}</div>
+        </div>
+        <span class="ramount income" style="margin-right:8px">${fmt(total)}</span>
+        <button class="btn-icon" onclick="editOrderAuth('${o.id}')" title="Bearbeiten">✏️</button>
+      </div>
+    `;
+  }).join('');
 
   const einkaufRows = einkaufsEntries.map(p => {
     const a = state.articles.find(x => x.id === p.articleId);
@@ -1145,7 +1156,7 @@ function renderBericht() {
         <h3>💰 Verkäufe</h3>
         ${verkaufRows || '<div style="color:var(--text2);font-size:.8rem">Keine bezahlten Bestellungen</div>'}
       </div>
-      ${Object.keys(verkaufMap).length ? `
+      ${verkaufsOrders.length ? `
         <div style="display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border)">
           <span style="font-weight:800;color:var(--green)">${fmt(totalVerkauf)}</span>
         </div>
@@ -1245,6 +1256,80 @@ function deletePurchase(purchaseId) {
   state.purchases = state.purchases.filter(x => x.id !== purchaseId);
   saveState(); closeModal();
   showToast('Einkauf gelöscht');
+  render();
+}
+
+function editOrderAuth(orderId) {
+  openModal(`
+    <h3>🔒 Passwort erforderlich</h3>
+    <div class="form-row"><div class="field">
+      <label>Passwort</label>
+      <input id="m-pw" type="password" placeholder="••••" autofocus>
+    </div></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-primary" onclick="checkOrderAuth('${orderId}')">Weiter</button>
+    </div>
+  `);
+}
+
+function checkOrderAuth(orderId) {
+  const pw = document.getElementById('m-pw').value;
+  if (pw !== '0719') { showToast('Falsches Passwort'); return; }
+  closeModal();
+  editOrder(orderId);
+}
+
+function editOrder(orderId) {
+  const o = state.orders.find(x => x.id === orderId);
+  if (!o) return;
+  const a = state.articles.find(x => x.id === o.articleId);
+  const name = a ? a.name : 'Unbekannt';
+  const dateStr = new Date(o.ts).toISOString().slice(0, 16);
+  openModal(`
+    <h3>✏️ Verkauf bearbeiten</h3>
+    <div style="color:var(--text2);font-size:.8rem;margin-bottom:12px">${esc(name)}</div>
+    <div class="form-row">
+      <div class="field"><label>Menge</label>
+        <input id="m-oq" type="number" min="1" value="${o.qty}">
+      </div>
+    </div>
+    <div class="form-row"><div class="field"><label>Datum & Uhrzeit</label>
+      <input id="m-ot" type="datetime-local" value="${dateStr}">
+    </div></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="deleteOrder('${o.id}')">🗑️ Löschen</button>
+      <button class="btn btn-primary" onclick="saveOrderEdit('${o.id}')">Speichern</button>
+    </div>
+  `);
+}
+
+function saveOrderEdit(orderId) {
+  const o = state.orders.find(x => x.id === orderId);
+  if (!o) return;
+  const qty = parseInt(document.getElementById('m-oq').value) || 0;
+  const tsVal = document.getElementById('m-ot').value;
+  if (qty <= 0) { showToast('Menge muss > 0 sein'); return; }
+  const diff = o.qty - qty;
+  const a = state.articles.find(x => x.id === o.articleId);
+  if (a) a.stock += diff;
+  o.qty = qty;
+  if (tsVal) o.ts = new Date(tsVal).getTime();
+  saveState(); closeModal();
+  showToast('Verkauf aktualisiert ✅');
+  render();
+}
+
+function deleteOrder(orderId) {
+  if (!confirm('Verkauf wirklich löschen?')) return;
+  const o = state.orders.find(x => x.id === orderId);
+  if (o) {
+    const a = state.articles.find(x => x.id === o.articleId);
+    if (a) a.stock += o.qty;
+  }
+  state.orders = state.orders.filter(x => x.id !== orderId);
+  saveState(); closeModal();
+  showToast('Verkauf gelöscht');
   render();
 }
 
