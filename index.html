@@ -135,6 +135,8 @@
     .list-item:last-child { border-bottom: none; }
     .list-item .name { flex: 1; font-weight: 600; font-size: .88rem; }
     .list-item .sub { font-size: .72rem; color: var(--text2); }
+    .sort-btns { display: flex; flex-direction: column; gap: 0; }
+    .sort-btns .btn-icon { font-size: .7rem; padding: 1px 4px; color: var(--text2); }
 
     .qty-badge {
       background: var(--surface2);
@@ -464,8 +466,12 @@ function renderInventur() {
   const getraenke = state.articles.filter(a => a.category === 'getraenk');
   const suessigkeiten = state.articles.filter(a => a.category === 'suessigkeit');
 
-  const renderList = (items) => items.map(a => `
+  const renderList = (items) => items.map((a, i) => `
     <div class="list-item">
+      <div class="sort-btns">
+        <button class="btn-icon" onclick="moveArticle('${a.id}',-1)" ${i === 0 ? 'disabled' : ''} style="opacity:${i === 0 ? '.25' : '1'}">▲</button>
+        <button class="btn-icon" onclick="moveArticle('${a.id}',1)" ${i === items.length-1 ? 'disabled' : ''} style="opacity:${i === items.length-1 ? '.25' : '1'}">▼</button>
+      </div>
       <div style="flex:1">
         <div class="name">${esc(a.name)}</div>
         <div class="sub">${fmt(a.price)} / Stück · Warnung ab ${a.lowStockThreshold}x</div>
@@ -578,6 +584,18 @@ function saveArticle() {
     state.articles.push({ id: uid(), name, category, price, stock, lowStockThreshold: threshold });
   }
   saveState(); closeModal(); render();
+}
+
+function moveArticle(id, dir) {
+  const idx = state.articles.findIndex(a => a.id === id);
+  const cat = state.articles[idx].category;
+  const catItems = state.articles.filter(a => a.category === cat);
+  const catIdx = catItems.findIndex(a => a.id === id);
+  const swapItem = catItems[catIdx + dir];
+  if (!swapItem) return;
+  const swapIdx = state.articles.findIndex(a => a.id === swapItem.id);
+  [state.articles[idx], state.articles[swapIdx]] = [state.articles[swapIdx], state.articles[idx]];
+  saveState(); render();
 }
 
 function deleteArticle(id) {
