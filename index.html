@@ -394,7 +394,8 @@
 // ══════════════════════════════════════════
 let state = {
   articles: [],    // { id, name, category, price, stock, lowStockThreshold }
-  guests: [],      // { id, name }
+  members: [],     // { id, name } — permanent
+  guests: [],      // { id, name } — pro Abend
   orders: [],      // { id, guestId, articleId, qty, ts, paid, payMode }
   purchases: [],   // { id, articleId, qty, costPerUnit, ts }
 };
@@ -405,14 +406,22 @@ function loadState() {
     try {
       const parsed = JSON.parse(saved);
       state = { ...state, ...parsed };
-      // migrations
       if (!state.purchases) state.purchases = [];
+      if (!state.members) state.members = [];
       state.articles.forEach(a => {
         if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3;
       });
     } catch(e) {}
   }
   if (!state.articles.length) initDemo();
+  if (!state.members.length) initMembers();
+}
+
+function initMembers() {
+  ['Christian', 'Hans', 'Guido', 'Sabine', 'Ursi'].forEach(name => {
+    state.members.push({ id: uid(), name });
+  });
+  saveState();
 }
 
 function saveState() {
@@ -641,8 +650,22 @@ function saveRefill(articleId) {
 // ══════════════════════════════════════════
 //  GÄSTE
 // ══════════════════════════════════════════
+function findPerson(id) {
+  return state.members.find(x => x.id === id) || state.guests.find(x => x.id === id);
+}
+
 function renderGaeste() {
-  const cards = state.guests.map(g => {
+  const memberCards = state.members.map(g => {
+    const tab = guestTotal(g.id, false);
+    return `
+      <div class="guest-card ${selectedGuestId === g.id ? 'selected' : ''}" onclick="selectGuest('${g.id}')">
+        <div class="gname">${esc(g.name)}</div>
+        ${tab > 0 ? `<div class="gtab">${fmt(tab)} offen</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  const guestCards = state.guests.map(g => {
     const tab = guestTotal(g.id, false);
     return `
       <div class="guest-card ${selectedGuestId === g.id ? 'selected' : ''}" onclick="selectGuest('${g.id}')">
@@ -655,20 +678,28 @@ function renderGaeste() {
   return `
     <div class="card">
       <div class="card-header">
-        <h2>Gäste heute</h2>
+        <h2>🏆 Vereinsmitglieder</h2>
+        <button class="btn btn-sm btn-secondary" onclick="addMember()">+ Vereinsmitglied</button>
+      </div>
+      <div class="guest-grid">${memberCards}</div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <h2>👥 Gäste heute</h2>
         <button class="btn btn-sm btn-primary" onclick="addGuest()">+ Gast</button>
       </div>
       ${state.guests.length
-        ? `<div class="guest-grid">${cards}</div>`
-        : '<div class="empty"><div class="eicon">👋</div><div>Noch keine Gäste hinzugefügt</div></div>'}
+        ? `<div class="guest-grid">${guestCards}</div>`
+        : '<div style="color:var(--text2);font-size:.8rem">Noch keine Gäste heute</div>'}
     </div>
-    ${selectedGuestId ? renderGuestDetail() : ''}
+    ${selectedGuestId ? renderPersonDetail() : ''}
   `;
 }
 
-function renderGuestDetail() {
-  const g = state.guests.find(x => x.id === selectedGuestId);
+function renderPersonDetail() {
+  const g = findPerson(selectedGuestId);
   if (!g) return '';
+  const isMember = state.members.some(x => x.id === g.id);
   const orders = state.orders.filter(o => o.guestId === g.id && !o.paid);
   const total = orders.reduce((s, o) => {
     const a = state.articles.find(x => x.id === o.articleId);
@@ -690,11 +721,15 @@ function renderGuestDetail() {
     `;
   }).join('');
 
+  const removeBtn = isMember
+    ? `<button class="btn-icon" onclick="removeMember('${g.id}')" title="Mitglied entfernen">❌</button>`
+    : `<button class="btn-icon" onclick="removeGuest('${g.id}')" title="Gast entfernen">❌</button>`;
+
   return `
     <div class="card">
       <div class="card-header">
-        <h2>${esc(g.name)}</h2>
-        <button class="btn-icon" onclick="removeGuest('${g.id}')" title="Gast entfernen">❌</button>
+        <h2>${isMember ? '🏆' : '👤'} ${esc(g.name)}</h2>
+        ${removeBtn}
       </div>
       ${orders.length ? lines : '<div style="color:var(--text2);font-size:.8rem">Kein offener Konsum</div>'}
       ${total > 0 ? `
@@ -709,6 +744,34 @@ function renderGuestDetail() {
       ` : ''}
     </div>
   `;
+}
+
+function addMember() {
+  openModal(`
+    <h3>Neues Vereinsmitglied</h3>
+    <div class="form-row"><div class="field">
+      <label>Name</label>
+      <input id="m-gname" placeholder="Name" autofocus>
+    </div></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveMember()">Hinzufügen</button>
+    </div>
+  `);
+}
+
+function saveMember() {
+  const name = document.getElementById('m-gname').value.trim();
+  if (!name) { showToast('Bitte Namen eingeben'); return; }
+  state.members.push({ id: uid(), name });
+  saveState(); closeModal(); render();
+}
+
+function removeMember(id) {
+  if (!confirm('Mitglied wirklich entfernen? Alle Bestellungen bleiben erhalten.')) return;
+  state.members = state.members.filter(m => m.id !== id);
+  selectedGuestId = null;
+  saveState(); render();
 }
 
 function addGuest() {
@@ -738,7 +801,7 @@ function selectGuest(id) {
 }
 
 function removeGuest(id) {
-  if (!confirm('Gast und alle offenen Bestellungen entfernen?')) return;
+  if (!confirm('Gast entfernen?')) return;
   state.guests = state.guests.filter(g => g.id !== id);
   state.orders = state.orders.filter(o => o.guestId !== id);
   selectedGuestId = null;
@@ -762,9 +825,14 @@ let orderMode = 'tab';
 let orderCart = {};
 
 function renderBestellung() {
-  const guestOptions = state.guests.map(g =>
-    `<option value="${g.id}" ${orderGuestId === g.id ? 'selected' : ''}>${esc(g.name)}</option>`
+  const memberOptions = state.members.map(g =>
+    `<option value="${g.id}" ${orderGuestId === g.id ? 'selected' : ''}>🏆 ${esc(g.name)}</option>`
   ).join('');
+  const guestOptions = state.guests.map(g =>
+    `<option value="${g.id}" ${orderGuestId === g.id ? 'selected' : ''}>👤 ${esc(g.name)}</option>`
+  ).join('');
+  const allOptions = (state.members.length ? `<optgroup label="Vereinsmitglieder">${memberOptions}</optgroup>` : '')
+    + (state.guests.length ? `<optgroup label="Gäste heute">${guestOptions}</optgroup>` : '');
 
   const getraenke = state.articles.filter(a => a.category === 'getraenk');
   const suessigkeiten = state.articles.filter(a => a.category === 'suessigkeit');
@@ -802,10 +870,10 @@ function renderBestellung() {
   return `
     <div class="card">
       <div class="card-header"><h2>Für wen?</h2></div>
-      ${state.guests.length
+      ${(state.members.length || state.guests.length)
         ? `<select onchange="setOrderGuest(this.value)">
-            <option value="">— Gast wählen —</option>
-            ${guestOptions}
+            <option value="">— Person wählen —</option>
+            ${allOptions}
            </select>`
         : `<div style="color:var(--text2);font-size:.8rem">Zuerst Gäste anlegen 👥</div>`}
       ${orderGuestId ? `
@@ -887,7 +955,8 @@ function submitOrder() {
 let billFilter = 'offen';
 
 function renderAbrechnung() {
-  const guests = state.guests.filter(g => filteredOrders(g.id).length > 0);
+  const allPeople = [...state.members, ...state.guests];
+  const guests = allPeople.filter(g => filteredOrders(g.id).length > 0);
 
   const totalOpen = state.orders
     .filter(o => !o.paid)
