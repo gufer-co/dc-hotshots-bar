@@ -1,8 +1,9 @@
 {
-  "name": "Darts Vereinsbar",
-  "short_name": "DartsBar",
+  "name": "DC Hotshots Vereinsbar",
+  "short_name": "DC Hotshots",
   "description": "Inventur und Konsum-Verwaltung für den Darts Verein",
-  "start_url": "/",
+  "start_url": "/dc-hotshots-bar/",
+  "scope": "/dc-hotshots-bar/",
   "display": "standalone",
   "background_color": "#1a1a2e",
   "theme_color": "#e94560",
