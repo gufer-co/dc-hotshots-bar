@@ -385,9 +385,6 @@
 <main id="app"></main>
 
 <nav>
-  <button onclick="showPage('inventur')" id="nav-inventur">
-    <span class="icon">📦</span>Inventur
-  </button>
   <button onclick="showPage('gaeste')" id="nav-gaeste">
     <span class="icon">👥</span>Gäste
   </button>
@@ -396,6 +393,9 @@
   </button>
   <button onclick="showPage('abrechnung')" id="nav-abrechnung">
     <span class="icon">💶</span>Abrech.
+  </button>
+  <button onclick="showPage('inventur')" id="nav-inventur">
+    <span class="icon">📦</span>Inventur
   </button>
   <button onclick="showPage('bericht')" id="nav-bericht">
     <span class="icon">📊</span>Bericht
@@ -472,8 +472,16 @@ function loadState() {
     if (data) {
       remoteUpdate = true;
       state = { ...state, ...data };
-      if (!state.purchases) state.purchases = [];
-      if (!state.members) state.members = [];
+      // Firebase speichert Arrays als Objekte — zurück in Arrays umwandeln
+      ['articles','members','guests','orders','purchases'].forEach(key => {
+        if (state[key] && !Array.isArray(state[key])) {
+          state[key] = Object.values(state[key]);
+        }
+        if (!state[key]) state[key] = [];
+      });
+      state.articles.forEach(a => {
+        if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3;
+      });
       localStorage.setItem('darts-bar-state', JSON.stringify(state));
       render();
       remoteUpdate = false;
@@ -1463,7 +1471,7 @@ window.closeModal = (e) => {
 //  INIT
 // ══════════════════════════════════════════
 loadState();
-showPage('inventur');
+showPage('gaeste');
 
 // Zeige Login wenn noch nicht authentifiziert
 if (sessionStorage.getItem('darts-auth') !== '1') {
