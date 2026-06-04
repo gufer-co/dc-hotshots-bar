@@ -873,9 +873,8 @@ function renderPersonDetail() {
     `;
   }).join('');
 
-  // Vereinsmitglieder haben keinen Löschen-Button — sie sind permanent
   const removeBtn = isMember
-    ? ''
+    ? `<button class="btn-icon" onclick="removeMemberAuth('${g.id}')" title="Mitglied entfernen">❌</button>`
     : `<button class="btn-icon" onclick="removeGuest('${g.id}')" title="Gast entfernen">❌</button>`;
 
   return `
@@ -920,8 +919,31 @@ function saveMember() {
   saveMembers(); closeModal(); render();
 }
 
+function removeMemberAuth(id) {
+  const m = state.members.find(x => x.id === id);
+  if (!m) return;
+  openModal(`
+    <h3>🔒 Mitglied entfernen</h3>
+    <p style="color:var(--text2);font-size:.85rem"><strong>${esc(m.name)}</strong> wirklich aus den Vereinsmitgliedern entfernen?</p>
+    <div class="form-row"><div class="field">
+      <label>Passwort</label>
+      <input id="m-pw" type="password" placeholder="••••" autofocus>
+    </div></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+      <button class="btn" style="background:#e74c3c;color:#fff" onclick="removeMemberCheck('${id}')">Entfernen</button>
+    </div>
+  `);
+}
+
+function removeMemberCheck(id) {
+  const pw = document.getElementById('m-pw').value;
+  if (pw !== '0719') { showToast('Falsches Passwort'); return; }
+  closeModal();
+  removeMember(id);
+}
+
 function removeMember(id) {
-  if (!confirm('Mitglied wirklich entfernen? Alle Bestellungen bleiben erhalten.')) return;
   state.members = state.members.filter(m => m.id !== id);
   selectedGuestId = null;
   saveMembers(); render();
