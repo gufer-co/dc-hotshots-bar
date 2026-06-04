@@ -558,6 +558,10 @@ function saveMembers() {
 
 function saveState() {
   localStorage.setItem('darts-bar-state', JSON.stringify(state));
+  // Members immer mitschreiben als Sicherheitsnetz
+  if (state.members.length) {
+    localStorage.setItem('darts-members', JSON.stringify(state.members));
+  }
   if (!remoteUpdate) {
     // Hauptdaten ohne members
     db.ref('data').set({
@@ -869,8 +873,9 @@ function renderPersonDetail() {
     `;
   }).join('');
 
+  // Vereinsmitglieder haben keinen Löschen-Button — sie sind permanent
   const removeBtn = isMember
-    ? `<button class="btn-icon" onclick="removeMember('${g.id}')" title="Mitglied entfernen">❌</button>`
+    ? ''
     : `<button class="btn-icon" onclick="removeGuest('${g.id}')" title="Gast entfernen">❌</button>`;
 
   return `
@@ -949,6 +954,11 @@ function selectGuest(id) {
 }
 
 function removeGuest(id) {
+  // Vereinsmitglieder dürfen niemals über removeGuest gelöscht werden
+  if (state.members.some(m => m.id === id)) {
+    showToast('Vereinsmitglieder können nicht gelöscht werden');
+    return;
+  }
   if (!confirm('Gast entfernen?')) return;
   state.guests = state.guests.filter(g => g.id !== id);
   state.orders = state.orders.filter(o => o.guestId !== id);
