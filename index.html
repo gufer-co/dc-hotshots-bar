@@ -651,6 +651,9 @@ function renderInventur() {
       </div>
       ${suessigkeiten.length ? renderList(suessigkeiten) : '<div style="color:var(--text2);font-size:.8rem">Keine Artikel</div>'}
     </div>
+    <div style="text-align:center;margin-top:6px">
+      <button class="btn btn-secondary btn-sm" style="color:#e74c3c;border-color:#e74c3c;opacity:.7" onclick="firebaseResetAuth()">🗑️ Firebase zurücksetzen</button>
+    </div>
   `;
 }
 
@@ -1195,6 +1198,41 @@ function clearPaid() {
   if (!confirm('Alle bezahlten Buchungen löschen?')) return;
   state.orders = state.orders.filter(o => !o.paid);
   saveState(); render();
+}
+
+function firebaseResetAuth() {
+  openModal(`
+    <h3>🗑️ Firebase zurücksetzen</h3>
+    <p style="color:var(--text2);font-size:.85rem">
+      <strong style="color:#e74c3c">Achtung:</strong> Alle Artikel, Gäste, Bestellungen, Einkäufe und Einladungen werden unwiderruflich gelöscht.<br><br>
+      Vereinsmitglieder bleiben erhalten.
+    </p>
+    <div class="form-row"><div class="field">
+      <label>Passwort</label>
+      <input id="m-pw" type="password" placeholder="••••" autofocus>
+    </div></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+      <button class="btn" style="background:#e74c3c;color:#fff" onclick="firebaseResetBestaetigt()">Alles löschen</button>
+    </div>
+  `);
+}
+
+function firebaseResetBestaetigt() {
+  const pw = document.getElementById('m-pw').value;
+  if (pw !== '0719') { showToast('Falsches Passwort'); return; }
+  closeModal();
+  // State leeren (Members behalten)
+  state.articles    = [];
+  state.guests      = [];
+  state.orders      = [];
+  state.purchases   = [];
+  state.einladungen = [];
+  // Firebase und localStorage löschen
+  db.ref('data').remove().catch(() => {});
+  localStorage.removeItem('darts-bar-state');
+  showToast('✅ Firebase zurückgesetzt – bitte Artikel neu anlegen');
+  render();
 }
 
 function einladenAuth(amount) {
