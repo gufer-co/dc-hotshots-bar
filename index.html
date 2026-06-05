@@ -699,7 +699,7 @@ function renderInventur() {
       <div class="card-header"><h2>💾 Datensicherung</h2></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm btn-secondary" style="flex:1" onclick="exportBackup()">⬇️ Backup speichern</button>
-        <button class="btn btn-sm btn-secondary" style="flex:1" onclick="document.getElementById('import-file').click()">⬆️ Backup laden</button>
+        <button class="btn btn-sm btn-secondary" style="flex:1" onclick="importBackupAuth()">⬆️ Backup laden</button>
       </div>
       <input id="import-file" type="file" accept="application/json,.json" style="display:none" onchange="importBackup(this)">
       <div style="font-size:.72rem;color:var(--text2);margin-top:8px">Speichert/lädt alle Daten als Datei. Regelmäßig sichern!</div>
@@ -733,6 +733,28 @@ function exportBackup() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   showToast('💾 Backup gespeichert');
+}
+
+function importBackupAuth() {
+  openModal(`
+    <h3>🔒 Backup laden</h3>
+    <p style="color:var(--text2);font-size:.85rem">Passwort erforderlich um ein Backup zu laden.</p>
+    <div class="form-row"><div class="field">
+      <label>Passwort</label>
+      <input id="m-pw" type="password" placeholder="••••" autofocus>
+    </div></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-primary" onclick="importBackupAuthCheck()">Weiter</button>
+    </div>
+  `);
+}
+
+function importBackupAuthCheck() {
+  const pw = document.getElementById('m-pw').value;
+  if (pw !== '0719') { showToast('Falsches Passwort'); return; }
+  closeModal();
+  document.getElementById('import-file').click();
 }
 
 function importBackup(input) {
