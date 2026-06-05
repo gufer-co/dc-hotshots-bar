@@ -503,6 +503,18 @@ function toArray(val) {
   return Object.values(val);
 }
 
+// Fehlende guestName-Felder aus noch existierenden Personen nachtragen
+function backfillGuestNames() {
+  let changed = false;
+  state.orders.forEach(o => {
+    if (!o.guestName) {
+      const p = findPerson(o.guestId);
+      if (p) { o.guestName = p.name; changed = true; }
+    }
+  });
+  return changed;
+}
+
 function loadState() {
   // Members zuerst aus localStorage (Fallback, damit nie leer)
   const savedMembers = localStorage.getItem('darts-members');
@@ -553,9 +565,11 @@ function loadState() {
       state.einladungen  = toArray(data.einladungen);
       state.articles.forEach(a => { if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3; });
       // KEIN initDemo() hier — Firebase-Daten niemals mit Demo überschreiben
+      const nameChanged = backfillGuestNames();
       localStorage.setItem('darts-bar-state', JSON.stringify(state));
       render();
       remoteUpdate = false;
+      if (nameChanged) saveState(); // nachgetragene Namen zurückschreiben
     }
   });
 }
