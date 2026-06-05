@@ -983,7 +983,8 @@ function removeGuest(id) {
   }
   if (!confirm('Gast entfernen?')) return;
   state.guests = state.guests.filter(g => g.id !== id);
-  state.orders = state.orders.filter(o => o.guestId !== id);
+  // Bezahlte Bestellungen bleiben für den Bericht erhalten, nur offene löschen
+  state.orders = state.orders.filter(o => o.guestId !== id || o.paid);
   selectedGuestId = null;
   saveState(); render();
 }
@@ -1120,7 +1121,8 @@ function submitOrder() {
     const a = state.articles.find(x => x.id === articleId);
     if (a) {
       a.stock -= qty;
-      state.orders.push({ id: uid(), guestId: orderGuestId, articleId, qty, ts: Date.now(), paid, payMode: paid ? 'cash' : null });
+      const p = findPerson(orderGuestId);
+      state.orders.push({ id: uid(), guestId: orderGuestId, guestName: p ? p.name : '?', articleId, qty, ts: Date.now(), paid, payMode: paid ? 'cash' : null });
     }
   }
   orderCart = {};
@@ -1345,7 +1347,7 @@ function renderBericht() {
     const price = a ? a.price : 0;
     const total = price * o.qty;
     const person = findPerson(o.guestId);
-    const pname = person ? person.name : '?';
+    const pname = person ? person.name : (o.guestName || '?');
     return `
       <div class="report-row">
         <div style="flex:1">
