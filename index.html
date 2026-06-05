@@ -459,6 +459,7 @@ firebase.initializeApp({
 const db = firebase.database();
 const dbRef = db.ref('state');
 let remoteUpdate = false; // verhindert Endlosschleife
+let firebaseLoaded = false; // erst nach erstem Firebase-Read darf geschrieben werden
 
 // ══════════════════════════════════════════
 //  LOGIN
@@ -556,7 +557,7 @@ function loadState() {
   // Firebase Listener: nur Artikel/Gäste/Bestellungen/Einkäufe — KEINE Members
   db.ref('data').on('value', snapshot => {
     const data = snapshot.val();
-    if (data) {
+    if (data && (toArray(data.articles).length || toArray(data.orders).length || toArray(data.purchases).length)) {
       remoteUpdate = true;
       state.articles     = toArray(data.articles);
       state.guests       = toArray(data.guests);
@@ -569,7 +570,11 @@ function loadState() {
       localStorage.setItem('darts-bar-state', JSON.stringify(state));
       render();
       remoteUpdate = false;
+      firebaseLoaded = true;
       if (nameChanged) saveState(); // nachgetragene Namen zurückschreiben
+    } else {
+      // Firebase leer: erst freigeben zum Schreiben, sobald lokale Daten existieren
+      firebaseLoaded = true;
     }
   });
 }
@@ -595,7 +600,9 @@ function saveState() {
   if (state.members.length) {
     localStorage.setItem('darts-members', JSON.stringify(state.members));
   }
-  if (!remoteUpdate) {
+  // NIE nach Firebase schreiben, bevor wir einmal aus Firebase gelesen haben
+  // (verhindert, dass ein frisches/Demo-Gerät echte Daten überschreibt)
+  if (!remoteUpdate && firebaseLoaded) {
     // Hauptdaten ohne members
     db.ref('data').set({
       articles:     state.articles,
