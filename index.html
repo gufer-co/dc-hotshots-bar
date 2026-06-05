@@ -1156,8 +1156,19 @@ function submitOrder() {
 let billFilter = 'offen';
 
 function renderAbrechnung() {
-  const allPeople = [...state.members, ...state.guests];
-  const guests = allPeople.filter(g => filteredOrders(g.id).length > 0);
+  // Personen direkt aus den (gefilterten) Bestellungen ableiten —
+  // so erscheinen auch bezahlte Buchungen von bereits gelöschten Gästen
+  const seen = {};
+  const guests = [];
+  state.orders.forEach(o => {
+    const matches = billFilter === 'offen' ? !o.paid
+                  : billFilter === 'bezahlt' ? o.paid
+                  : true;
+    if (!matches || seen[o.guestId]) return;
+    seen[o.guestId] = true;
+    const p = findPerson(o.guestId);
+    guests.push({ id: o.guestId, name: p ? p.name : (o.guestName || '?') });
+  });
 
   const totalOpen = state.orders
     .filter(o => !o.paid)
