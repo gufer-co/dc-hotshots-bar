@@ -504,12 +504,28 @@ function toArray(val) {
 }
 
 function loadState() {
-  // Members NUR aus localStorage — nie aus Firebase (damit sie nie verschwinden)
+  // Members zuerst aus localStorage (Fallback, damit nie leer)
   const savedMembers = localStorage.getItem('darts-members');
   if (savedMembers) {
     try { state.members = JSON.parse(savedMembers); } catch(e) {}
   }
   if (!state.members.length) initMembers();
+
+  // Members Firebase-Listener: synct zwischen Geräten, überschreibt aber nie mit leer
+  db.ref('members').on('value', snapshot => {
+    const remoteMembers = toArray(snapshot.val());
+    if (remoteMembers.length) {
+      // Firebase hat Mitglieder -> als Quelle der Wahrheit übernehmen
+      remoteUpdate = true;
+      state.members = remoteMembers;
+      localStorage.setItem('darts-members', JSON.stringify(state.members));
+      render();
+      remoteUpdate = false;
+    } else if (state.members.length) {
+      // Firebase noch leer -> lokale Mitglieder hochladen (seed)
+      db.ref('members').set(state.members).catch(() => {});
+    }
+  });
 
   // Restliche Daten aus localStorage laden
   const saved = localStorage.getItem('darts-bar-state');
@@ -552,8 +568,11 @@ function initMembers() {
 }
 
 function saveMembers() {
-  // Members NUR in separatem localStorage — nie Firebase
   localStorage.setItem('darts-members', JSON.stringify(state.members));
+  // Members auch nach Firebase synchronisieren (zwischen Geräten)
+  if (!remoteUpdate) {
+    db.ref('members').set(state.members).catch(() => {});
+  }
 }
 
 function saveState() {
