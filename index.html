@@ -413,7 +413,7 @@
 
 <header>
   <h1>🎯 DC Hotshots <span>Vereinsbar</span></h1>
-  <div style="font-size:.6rem;color:var(--text2);margin-top:2px">v2024-06-03</div>
+  <div style="font-size:.6rem;color:var(--text2);margin-top:2px">v2026-06-26 (sync2)</div>
 </header>
 
 <main id="app"></main>
@@ -461,6 +461,7 @@ const dbRef = db.ref('state');
 let remoteUpdate = false; // verhindert Endlosschleife
 let firebaseLoaded = false; // erst nach erstem Firebase-Read darf geschrieben werden
 let membersLoaded = false;  // erst nach erstem Members-Read darf geschrieben werden
+let migrated = false;       // einmalige Migration altes -> neues Firebase-Layout
 
 // ══════════════════════════════════════════
 //  LOGIN
@@ -548,30 +549,74 @@ function loadState() {
   state.articles.forEach(a => { if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3; });
   if (!state.articles.length) initDemo();
 
-  // Firebase Listener: nur Artikel/Gäste/Bestellungen/Einkäufe — KEINE Members
+  // Firebase Listener: Artikel/Gäste/Bestellungen/Einkäufe/Einladungen — KEINE Members
+  // Neues Layout:  data/meta = {articles, einladungen},  data/orders/<id>,
+  //                data/purchases/<id>, data/guests/<id>  (jeweils einzeln gespeichert)
+  // Altes Layout:  data.articles / data.orders ... als Arrays direkt unter data
   db.ref('data').on('value', snapshot => {
     const data = snapshot.val();
-    if (data && (toArray(data.articles).length || toArray(data.orders).length || toArray(data.purchases).length)) {
+    const meta = data && data.meta ? data.meta : data; // Fallback altes Layout
+    const articles    = toArray(meta && meta.articles);
+    const einladungen = toArray(meta && meta.einladungen);
+    const orders      = toArray(data && data.orders);
+    const purchases   = toArray(data && data.purchases);
+    const guests      = toArray(data && data.guests);
+
+    const hasReal = articles.length || orders.length || purchases.length || guests.length;
+    if (data && hasReal) {
       remoteUpdate = true;
-      state.articles     = toArray(data.articles);
-      state.guests       = toArray(data.guests);
-      state.orders       = toArray(data.orders);
-      state.purchases    = toArray(data.purchases);
-      state.einladungen  = toArray(data.einladungen);
+      state.articles     = articles;
+      state.guests       = guests;
+      state.orders       = orders;
+      state.purchases    = purchases;
+      state.einladungen  = einladungen;
       state.articles.forEach(a => { if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3; });
-      // KEIN initDemo() hier — Firebase-Daten niemals mit Demo überschreiben
       const nameChanged = backfillGuestNames();
       localStorage.setItem('darts-bar-state', JSON.stringify(state));
+      firebaseLoaded = true;
       render();
       remoteUpdate = false;
-      firebaseLoaded = true;
-      if (nameChanged) saveState(); // nachgetragene Namen zurückschreiben
+
+      // Einmalige Migration vom alten Layout (Arrays unter data) ins neue (data/meta + Einzel-Keys)
+      if (!migrated && data && !data.meta) {
+        migrated = true;
+        db.ref('data').set({
+          meta:      { articles: state.articles, einladungen: state.einladungen },
+          orders:    arrToMap(state.orders),
+          purchases: arrToMap(state.purchases),
+          guests:    arrToMap(state.guests),
+        }).catch(() => {});
+      } else if (nameChanged) {
+        // nachgetragene Namen einzeln zurückschreiben
+        state.orders.forEach(o => putOrder(o));
+      }
     } else {
       // Firebase leer: erst freigeben zum Schreiben, sobald lokale Daten existieren
       firebaseLoaded = true;
     }
   });
 }
+
+// Wandelt ein Array (mit .id) in eine nach id verschlüsselte Map für Firebase
+function arrToMap(arr) {
+  const m = {};
+  (arr || []).forEach(x => { if (x && x.id) m[x.id] = x; });
+  return m;
+}
+
+// Schreib-Helfer: nur erlaubt nach erfolgreichem Firebase-Read und nicht während Remote-Update
+function fbReady() { return firebaseLoaded && !remoteUpdate; }
+function saveLocal() {
+  localStorage.setItem('darts-bar-state', JSON.stringify(state));
+  if (state.members.length) localStorage.setItem('darts-members', JSON.stringify(state.members));
+}
+function saveMeta()      { if (fbReady()) db.ref('data/meta').set({ articles: state.articles, einladungen: state.einladungen }).catch(() => {}); }
+function putOrder(o)     { if (fbReady() && o && o.id) db.ref('data/orders/' + o.id).set(o).catch(() => {}); }
+function delOrder(id)    { if (fbReady()) db.ref('data/orders/' + id).remove().catch(() => {}); }
+function putPurchase(p)  { if (fbReady() && p && p.id) db.ref('data/purchases/' + p.id).set(p).catch(() => {}); }
+function delPurchase(id) { if (fbReady()) db.ref('data/purchases/' + id).remove().catch(() => {}); }
+function putGuest(g)     { if (fbReady() && g && g.id) db.ref('data/guests/' + g.id).set(g).catch(() => {}); }
+function delGuest(id)    { if (fbReady()) db.ref('data/guests/' + id).remove().catch(() => {}); }
 
 // Füllt nur das Array mit Default-Mitgliedern — schreibt NICHT nach Firebase
 function fillDefaultMembers() {
@@ -587,24 +632,11 @@ function saveMembers() {
   }
 }
 
+// saveState() persistiert Artikel + Einladungen (Meta) und den lokalen Speicher.
+// Bestellungen/Einkäufe/Gäste werden EINZELN über put*/del* gespeichert.
 function saveState() {
-  localStorage.setItem('darts-bar-state', JSON.stringify(state));
-  // Members immer mitschreiben als Sicherheitsnetz
-  if (state.members.length) {
-    localStorage.setItem('darts-members', JSON.stringify(state.members));
-  }
-  // NIE nach Firebase schreiben, bevor wir einmal aus Firebase gelesen haben
-  // (verhindert, dass ein frisches/Demo-Gerät echte Daten überschreibt)
-  if (!remoteUpdate && firebaseLoaded) {
-    // Hauptdaten ohne members
-    db.ref('data').set({
-      articles:     state.articles,
-      guests:       state.guests,
-      orders:       state.orders,
-      purchases:    state.purchases,
-      einladungen:  state.einladungen,
-    }).catch(() => {});
-  }
+  saveLocal();
+  saveMeta();
 }
 
 function initDemo() {
@@ -771,7 +803,16 @@ function importBackup(input) {
       state.members = toArray(data.members);
       saveMembers();
     }
-    saveState();
+    saveLocal();
+    // Komplettes neues Layout nach Firebase schreiben
+    if (fbReady()) {
+      db.ref('data').set({
+        meta:      { articles: state.articles, einladungen: state.einladungen },
+        orders:    arrToMap(state.orders),
+        purchases: arrToMap(state.purchases),
+        guests:    arrToMap(state.guests),
+      }).catch(() => {});
+    }
     showToast('✅ Backup geladen');
     render();
   };
@@ -910,8 +951,12 @@ function saveRefill(articleId) {
   const a = state.articles.find(x => x.id === articleId);
   if (!a) return;
   a.stock += qty;
-  state.purchases.push({ id: uid(), articleId, qty, costPerUnit: cost, ts: Date.now() });
-  saveState(); closeModal();
+  const p = { id: uid(), articleId, qty, costPerUnit: cost, ts: Date.now() };
+  state.purchases.push(p);
+  saveLocal();
+  saveMeta();          // Lagerbestand (Artikel)
+  putPurchase(p);      // Einkauf einzeln speichern
+  closeModal();
   showToast(`✅ +${qty}x ${a.name} eingebucht`);
   render();
 }
@@ -1083,8 +1128,9 @@ function addGuest() {
 function saveGuest() {
   const name = document.getElementById('m-gname').value.trim();
   if (!name) { showToast('Bitte Namen eingeben'); return; }
-  state.guests.push({ id: uid(), name });
-  saveState(); closeModal(); render();
+  const g = { id: uid(), name };
+  state.guests.push(g);
+  saveLocal(); putGuest(g); closeModal(); render();
 }
 
 function selectGuest(id) {
@@ -1101,16 +1147,22 @@ function removeGuest(id) {
   if (!confirm('Gast entfernen?')) return;
   state.guests = state.guests.filter(g => g.id !== id);
   // Bezahlte Bestellungen bleiben für den Bericht erhalten, nur offene löschen
+  const toDelete = state.orders.filter(o => o.guestId === id && !o.paid);
   state.orders = state.orders.filter(o => o.guestId !== id || o.paid);
   selectedGuestId = null;
-  saveState(); render();
+  saveLocal();
+  delGuest(id);
+  toDelete.forEach(o => delOrder(o.id));
+  render();
 }
 
 function payGuest(guestId, mode) {
+  const changed = [];
   state.orders.forEach(o => {
-    if (o.guestId === guestId && !o.paid) { o.paid = true; o.payMode = mode; }
+    if (o.guestId === guestId && !o.paid) { o.paid = true; o.payMode = mode; changed.push(o); }
   });
-  saveState();
+  saveLocal();
+  changed.forEach(o => putOrder(o));
   showToast('Bezahlt! 🎉');
   render();
 }
@@ -1234,16 +1286,21 @@ function submitOrder() {
     if (a && a.stock < q) { showToast(`Zu wenig Bestand: ${a.name}`); return; }
   }
   const paid = orderMode === 'sofort';
+  const newOrders = [];
   for (const [articleId, qty] of entries) {
     const a = state.articles.find(x => x.id === articleId);
     if (a) {
       a.stock -= qty;
       const p = findPerson(orderGuestId);
-      state.orders.push({ id: uid(), guestId: orderGuestId, guestName: p ? p.name : '?', articleId, qty, ts: Date.now(), paid, payMode: paid ? 'cash' : null });
+      const o = { id: uid(), guestId: orderGuestId, guestName: p ? p.name : '?', articleId, qty, ts: Date.now(), paid, payMode: paid ? 'cash' : null };
+      state.orders.push(o);
+      newOrders.push(o);
     }
   }
   orderCart = {};
-  saveState();
+  saveLocal();
+  saveMeta();                       // Lagerbestand (Artikel) aktualisieren
+  newOrders.forEach(o => putOrder(o)); // jede Bestellung einzeln speichern
   showToast(paid ? '💵 Bezahlt & gebucht!' : '📋 Auf Tab gebucht!');
   render();
 }
@@ -1358,8 +1415,11 @@ function toggleBill(header) {
 
 function clearPaid() {
   if (!confirm('Alle bezahlten Buchungen löschen?')) return;
+  const toDelete = state.orders.filter(o => o.paid);
   state.orders = state.orders.filter(o => !o.paid);
-  saveState(); render();
+  saveLocal();
+  toDelete.forEach(o => delOrder(o.id));
+  render();
 }
 
 function firebaseResetAuth() {
@@ -1417,8 +1477,11 @@ function einladenBestaetigt(amount) {
   if (pw !== '0719') { showToast('Falsches Passwort'); return; }
   closeModal();
   state.einladungen.push({ id: uid(), ts: Date.now(), amount });
-  state.orders = state.orders.filter(o => o.paid); // offene löschen
-  saveState();
+  const toDelete = state.orders.filter(o => !o.paid); // offene werden gelöscht
+  state.orders = state.orders.filter(o => o.paid);
+  saveLocal();
+  saveMeta();                          // Einladung (Meta) speichern
+  toDelete.forEach(o => delOrder(o.id)); // offene Bestellungen einzeln löschen
   showToast(`🎁 ${fmt(amount)} als Einladung gebucht`);
   render();
 }
@@ -1652,7 +1715,7 @@ function savePurchaseEdit(purchaseId) {
   p.qty = qty;
   p.costPerUnit = cost;
   if (tsVal) p.ts = new Date(tsVal).getTime();
-  saveState(); closeModal();
+  saveState(); putPurchase(p); closeModal();
   showToast('Einkauf aktualisiert ✅');
   render();
 }
@@ -1665,7 +1728,7 @@ function deletePurchase(purchaseId) {
     if (a) a.stock -= p.qty;
   }
   state.purchases = state.purchases.filter(x => x.id !== purchaseId);
-  saveState(); closeModal();
+  saveState(); delPurchase(purchaseId); closeModal();
   showToast('Einkauf gelöscht');
   render();
 }
@@ -1726,7 +1789,7 @@ function saveOrderEdit(orderId) {
   if (a) a.stock += diff;
   o.qty = qty;
   if (tsVal) o.ts = new Date(tsVal).getTime();
-  saveState(); closeModal();
+  saveState(); putOrder(o); closeModal();
   showToast('Verkauf aktualisiert ✅');
   render();
 }
@@ -1739,7 +1802,7 @@ function deleteOrder(orderId) {
     if (a) a.stock += o.qty;
   }
   state.orders = state.orders.filter(x => x.id !== orderId);
-  saveState(); closeModal();
+  saveState(); delOrder(orderId); closeModal();
   showToast('Verkauf gelöscht');
   render();
 }
