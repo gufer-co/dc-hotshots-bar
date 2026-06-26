@@ -460,6 +460,7 @@ const db = firebase.database();
 const dbRef = db.ref('state');
 let remoteUpdate = false; // verhindert Endlosschleife
 let firebaseLoaded = false; // erst nach erstem Firebase-Read darf geschrieben werden
+let membersLoaded = false;  // erst nach erstem Members-Read darf geschrieben werden
 
 // ══════════════════════════════════════════
 //  LOGIN
@@ -486,18 +487,6 @@ let state = {
   einladungen:  [],  // { id, ts, amount } — eingeladene offene Beträge
 };
 
-function applyStateData(data) {
-  if (data) state = { ...state, ...data };
-  if (!state.purchases)   state.purchases   = [];
-  if (!state.members)     state.members     = [];
-  if (!state.einladungen) state.einladungen = [];
-  state.articles.forEach(a => {
-    if (a.lowStockThreshold === undefined) a.lowStockThreshold = 3;
-  });
-  if (!state.articles.length) initDemo();
-  if (!state.members.length) initMembers();
-}
-
 function toArray(val) {
   if (!val) return [];
   if (Array.isArray(val)) return val;
@@ -517,12 +506,13 @@ function backfillGuestNames() {
 }
 
 function loadState() {
-  // Members zuerst aus localStorage (Fallback, damit nie leer)
+  // Members zuerst aus localStorage (nur zur sofortigen Anzeige, NICHT nach Firebase schreiben)
   const savedMembers = localStorage.getItem('darts-members');
   if (savedMembers) {
     try { state.members = JSON.parse(savedMembers); } catch(e) {}
   }
-  if (!state.members.length) initMembers();
+  // WICHTIG: hier KEIN initMembers() — das würde Default-Mitglieder nach Firebase
+  // schreiben, bevor wir die echten gelesen haben. Defaults nur seeden wenn Firebase leer ist.
 
   // Members Firebase-Listener: synct zwischen Geräten, überschreibt aber nie mit leer
   db.ref('members').on('value', snapshot => {
@@ -532,11 +522,15 @@ function loadState() {
       remoteUpdate = true;
       state.members = remoteMembers;
       localStorage.setItem('darts-members', JSON.stringify(state.members));
+      membersLoaded = true;
       render();
       remoteUpdate = false;
-    } else if (state.members.length) {
-      // Firebase noch leer -> lokale Mitglieder hochladen (seed)
+    } else {
+      // Firebase wirklich leer -> jetzt (und nur jetzt) seeden
+      if (!state.members.length) fillDefaultMembers();
+      membersLoaded = true;
       db.ref('members').set(state.members).catch(() => {});
+      render();
     }
   });
 
@@ -579,17 +573,16 @@ function loadState() {
   });
 }
 
-function initMembers() {
-  ['Christian', 'Hans', 'Guido', 'Sabine', 'Ursi'].forEach(name => {
-    state.members.push({ id: uid(), name });
-  });
-  saveMembers();
+// Füllt nur das Array mit Default-Mitgliedern — schreibt NICHT nach Firebase
+function fillDefaultMembers() {
+  state.members = ['Christian', 'Hans', 'Guido', 'Sabine', 'Ursi'].map(name => ({ id: uid(), name }));
 }
 
 function saveMembers() {
   localStorage.setItem('darts-members', JSON.stringify(state.members));
-  // Members auch nach Firebase synchronisieren (zwischen Geräten)
-  if (!remoteUpdate) {
+  // Members nur nach Firebase schreiben, wenn wir vorher gelesen haben
+  // (verhindert, dass ein frisches Gerät die echte Liste mit Defaults überschreibt)
+  if (!remoteUpdate && membersLoaded) {
     db.ref('members').set(state.members).catch(() => {});
   }
 }
