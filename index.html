@@ -10,6 +10,7 @@
   <link rel="manifest" href="manifest.json">
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -457,6 +458,7 @@ firebase.initializeApp({
   appId: "1:533694552241:web:901786f2cf26cdf28eea90"
 });
 const db = firebase.database();
+const auth = firebase.auth();
 const dbRef = db.ref('state');
 let remoteUpdate = false; // verhindert Endlosschleife
 let firebaseLoaded = false; // erst nach erstem Firebase-Read darf geschrieben werden
@@ -1871,15 +1873,32 @@ window.closeModal = (e) => {
 // ══════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════
-loadState();
-showPage('gaeste');
+let appStarted = false;
+function startApp() {
+  if (appStarted) return;
+  appStarted = true;
+  loadState();
+  showPage('gaeste');
 
-// Zeige Login wenn noch nicht authentifiziert
-if (sessionStorage.getItem('darts-auth') !== '1') {
-  document.getElementById('login-screen').style.display = 'flex';
-} else {
-  document.getElementById('login-screen').style.display = 'none';
+  // Zeige Login wenn noch nicht authentifiziert
+  if (sessionStorage.getItem('darts-auth') !== '1') {
+    document.getElementById('login-screen').style.display = 'flex';
+  } else {
+    document.getElementById('login-screen').style.display = 'none';
+  }
 }
+
+// Anonyme Firebase-Anmeldung (damit die DB-Regeln auf "nur angemeldet" gestellt
+// werden können und die Datenbank nicht mehr öffentlich offen ist).
+auth.onAuthStateChanged(user => { if (user) startApp(); });
+auth.signInAnonymously().catch(err => {
+  // Falls Anonyme Anmeldung (noch) nicht aktiviert ist: App trotzdem starten,
+  // damit sie unter offenen Regeln weiter funktioniert.
+  console.warn('Anonyme Anmeldung fehlgeschlagen:', err && err.code);
+  startApp();
+});
+// Sicherheitsnetz: falls Auth hängt, nach 4s trotzdem starten
+setTimeout(startApp, 4000);
 
 // Alle alten Service Worker deregistrieren
 if ('serviceWorker' in navigator) {
