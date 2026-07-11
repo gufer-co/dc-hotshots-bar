@@ -419,7 +419,7 @@
 
 <header>
   <h1>🎯 DC Hotshots <span>Vereinsbar</span></h1>
-  <div style="font-size:.6rem;color:var(--text2);margin-top:2px">v2026-07-01 (auth)</div>
+  <div style="font-size:.6rem;color:var(--text2);margin-top:2px">v2026-07-02 (print)</div>
 </header>
 
 <main id="app"></main>
@@ -1659,7 +1659,63 @@ function renderBericht() {
 
 function setBerichtMonth(m) { berichtMonth = m; render(); }
 
-function printPage() { window.print(); }
+function printPage() {
+  const app = document.getElementById('app');
+  if (!app) { window.print(); return; }
+  // Aktuellen Seiteninhalt klonen und interaktive Elemente entfernen
+  const clone = app.cloneNode(true);
+  clone.querySelectorAll('button, select, input, textarea, .pdf-btn, .sort-btns').forEach(el => el.remove());
+  const titleEl = clone.querySelector('.print-title');
+  const heading = titleEl ? titleEl.textContent : 'DC Hotshots Vereinsbar';
+
+  const css = `
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; color: #000;
+           margin: 16px; font-size: 12px; }
+    .print-title { font-size: 16px; font-weight: 800; margin: 0 0 14px; }
+    .card { border: 1px solid #ccc; border-radius: 6px; padding: 10px 12px;
+            margin-bottom: 12px; break-inside: avoid; page-break-inside: avoid; }
+    .card-header { display: flex; align-items: center; margin-bottom: 8px; }
+    h2 { font-size: 14px; margin: 0 0 8px; }
+    h3 { font-size: 13px; margin: 8px 0 6px; }
+    .summary-bar { display: flex; gap: 10px; margin-bottom: 12px; }
+    .summary-chip { flex: 1; border: 1px solid #ccc; border-radius: 6px; padding: 8px; text-align: center; }
+    .sc-label { font-size: 10px; text-transform: uppercase; color: #555; }
+    .sc-val { font-size: 15px; font-weight: 800; margin-top: 2px; }
+    .sc-val.income  { color: #1a7a3c; }
+    .sc-val.expense { color: #c0392b; }
+    .sc-val.profit  { color: #1a5fa8; }
+    .report-row { display: flex; align-items: center; justify-content: space-between;
+                  padding: 5px 0; border-bottom: 1px solid #eee; gap: 8px; }
+    .report-row:last-child { border-bottom: none; }
+    .rname { font-weight: 600; }
+    .ramount { font-weight: 700; white-space: nowrap; }
+    .ramount.income  { color: #1a7a3c; }
+    .ramount.expense { color: #c0392b; }
+    .list-item { display: flex; align-items: center; justify-content: space-between;
+                 gap: 8px; padding: 5px 0; border-bottom: 1px solid #eee; }
+    .list-item .name { font-weight: 600; }
+    .list-item .sub { font-size: 10px; color: #555; }
+    .qty-badge { border: 1px solid #ccc; border-radius: 10px; padding: 2px 8px; font-weight: 700; }
+    .qty-badge.low { background: #fdd; color: #900; }
+  `;
+  const doc = `<!doctype html><html><head><meta charset="utf-8">
+    <title>${heading}</title><style>${css}</style></head>
+    <body>${clone.innerHTML}</body></html>`;
+
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  document.body.appendChild(iframe);
+  const idoc = iframe.contentWindow.document;
+  idoc.open(); idoc.write(doc); idoc.close();
+  iframe.onload = () => {
+    setTimeout(() => {
+      try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+      catch (e) { window.print(); }
+      setTimeout(() => { try { document.body.removeChild(iframe); } catch (e) {} }, 2000);
+    }, 250);
+  };
+}
 
 function editPurchaseAuth(purchaseId) {
   openModal(`
