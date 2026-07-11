@@ -370,10 +370,15 @@
     .pdf-btn:hover { border-color: var(--accent2); color: var(--accent2); }
 
     @media print {
-      body { background: #fff !important; color: #000 !important; }
+      /* WICHTIG: Bildschirm-Beschränkungen aufheben, damit der GESAMTE Inhalt
+         über mehrere Seiten gedruckt wird (statt nur des sichtbaren Ausschnitts) */
+      html, body { height: auto !important; overflow: visible !important; }
+      body { display: block !important; background: #fff !important; color: #000 !important; }
       nav, .pdf-btn, .btn, .btn-icon, .sort-btns,
-      #login-overlay, .toast { display: none !important; }
-      #app { padding: 0 !important; }
+      #login-overlay, #login-screen, .toast { display: none !important; }
+      #app { position: static !important; flex: none !important;
+             height: auto !important; overflow: visible !important; padding: 0 !important; }
+      .month-select select { display: none !important; }
       .card { background: #fff !important; border: 1px solid #ccc !important;
                box-shadow: none !important; break-inside: avoid; }
       .card-header h2, h2, h3 { color: #000 !important; }
